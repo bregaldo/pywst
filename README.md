@@ -8,6 +8,7 @@ This package is designed to easily perform WST and RWST analysis for astrophysic
 ## Install from source
 
 pip install -r requirements.txt
+
 pip install .
 
 ## Standard installation (from the Python Package Index) [coming...]

@@ -212,7 +212,7 @@ class WST:
             dim = np.sum (filtering)
             covM = self.coeffsCov [np.outer (filtering, filtering)].reshape (dim, dim)
             # If demanded, remove off diagonal coefficients when we have too few samples to get a definite sample covariance matrix.
-            if self.coeffsCovNbSamples < dim and autoRemoveOffDiagonalCoeffs:
+            if self.coeffsCovNbSamples < dim + 1 and autoRemoveOffDiagonalCoeffs:
                 print ("Warning! Removing off diagonal coefficients of the sample covariance matrix (only " + str (self.coeffsCovNbSamples) + " samples for dimension " + str (dim) + ").")
                 covM = np.diag (np.diag (covM))
             return covM, self.index [:, filtering]
