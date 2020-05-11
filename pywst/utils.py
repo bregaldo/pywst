@@ -4,28 +4,34 @@ import numpy as np
 import scipy.fft
 
 def fft (data):
+    """
+    Parallel FFT.
+    """
     return scipy.fft.fft2 (data, workers = -1) # By default, fft2 applies to the last two axes of data.
 
 def ifft (data):
+    """
+    Parallel inverse FFT.
+    """
     return scipy.fft.ifft2 (data, workers = -1) # By default, ifft2 applies to the last two axes of data.
 
 def subsampleFourier (x, k, normalize = False):
     """
-    
+    Periodization in Fourier space. This corresponds to a subsampling in physical space.
 
     Parameters
     ----------
-    x : TYPE
+    x : array
+        Input data (2D or 3D arrays depending of a potential batch dimension).
+    k : int
         DESCRIPTION.
-    k : TYPE
-        DESCRIPTION.
-    normalize : TYPE, optional
+    normalize : bool, optional
         Do we want to retain the L1 norm of the signal? The default is False.
 
     Returns
     -------
-    out : TYPE
-        DESCRIPTION.
+    out : array
+        Subsampled data (also in Fourier space).
 
     """
     if x.ndim == 2: # Typical case: x is an image

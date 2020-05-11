@@ -4,8 +4,31 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 class RWST:
+    """
+    Reduced Wavelet Scattering Transform (RWST) class contains the output of the RWST of an image or a batch of images.
+    This contains the corresponding coefficients and helps to handle and to plot these coefficients.
+    """
     
     def __init__ (self, J, L, model, locShape = ()):
+        """
+        Constructor.
+
+        Parameters
+        ----------
+        J : int
+            Number of dyadic scales.
+        L : int
+            Number of angles between 0 and pi.
+        model : RWSTModelBase
+            Chosen RWST model object.
+        locShape : tuple of ints, optional
+            Shape of the local dimensions (batch dimension + local dimensions)
+
+        Returns
+        -------
+        None.
+
+        """
         self.J = J
         self.L = L
         self.model = model
@@ -21,7 +44,28 @@ class RWST:
         self.coeffsCov ['m1'] = np.zeros ((J, model.nbParamsLayer1, model.nbParamsLayer1) + locShape)
         self.coeffsCov ['m2'] = np.zeros ((J, J, model.nbParamsLayer2, model.nbParamsLayer2) + locShape)
 
-    def setCoeffs (self, layer, jVals, coeffs, coeffsCov, chi2r):
+    def _setCoeffs (self, layer, jVals, coeffs, coeffsCov, chi2r):
+        """
+        Internal functions. Set the values of the coefficients during the optimization (see RWSTOp.apply function).
+
+        Parameters
+        ----------
+        layer : int
+            Layer of coefficients.
+        jVals : int or (int,int)
+            If layer == 1, j_1 value. If layer == 2, (j_1,j_2) values. Otherwise, ignored.
+        coeffs : array
+            Coefficients found during the optimization.
+        coeffsCov : array
+            Covariance matrix corresponding to the coefficients.
+        chi2r : TYPE
+            Reduced chi square values for the corresponding optimization.
+
+        Returns
+        -------
+        None.
+
+        """
         if layer == 0:
             self.coeffs ['m0'] = coeffs
             self.coeffsCov ['m0'] = coeffsCov
@@ -36,6 +80,26 @@ class RWST:
             self.coeffsCov ['m2'][j1, j2] = coeffsCov
 
     def getCoeffs (self, name):
+        """
+        Returns the selected set of RWST coefficients.
+
+        Parameters
+        ----------
+        name : str
+            Can be 'S0' for layer 0 coefficients, 'chi2r1' or 'chi2r2' for reduced chi square values (for layer 1 and layer 2 optimization respectively),
+            or the name of a term of the corresponding model (consistent with model.layer1Names and model.layer2Names).
+
+        Raises
+        ------
+        Exception
+            DESCRIPTION.
+
+        Returns
+        -------
+        array
+            Corresponding coefficients.
+
+        """
         if name == 'S0':
             return self.coeffs ['m0']
         elif name == 'chi2r1':
@@ -52,6 +116,26 @@ class RWST:
         raise Exception ("Unknown name of parameter: " + str (name))
         
     def getCoeffsStd (self, name):
+        """
+        Returns the standard deviation of the selected set of RWST coefficients.
+
+        Parameters
+        ----------
+        name : str
+            Can be 'S0' for layer 0 coefficients, or the name of a term of the corresponding model
+            (consistent with model.layer1Names and model.layer2Names).
+
+        Raises
+        ------
+        Exception
+            DESCRIPTION.
+
+        Returns
+        -------
+        array
+            Corresponding standard deviation values.
+
+        """
         if name == 'S0':
             return np.sqrt (self.coeffsCov ['m0'][0, 0])
         else:
@@ -64,6 +148,29 @@ class RWST:
         raise Exception ("Unknown name of parameter: " + str (name))
         
     def getCoeffsCov (self, layer = None, j1 = None, j2 = None):
+        """
+        Returns the covariance matrix of the selected set of RWST coefficients.
+
+        Parameters
+        ----------
+        layer : int, optional
+            Layer of coefficients (must be 0, 1 or 2). The default is None.
+        j1 : int, optional
+            Specific j_1 value. The default is None.
+        j2 : int, optional
+            Specific j_2 value. The default is None.
+
+        Raises
+        ------
+        Exception
+            DESCRIPTION.
+
+        Returns
+        -------
+        array
+            Corresponding covariance matrix.
+
+        """
         if layer == 0:
             return self.coeffsCov ['m0']
         elif layer == 1:
@@ -83,12 +190,21 @@ class RWST:
         else:
             raise Exception ("Choose a layer between 0 and 2!")
             
-    def finalize (self):
+    def _finalize (self):
+        """
+        Internal function that is called by RWSTOp.apply.
+        Call the corresponding model finalize function that typically deal with potential model parameters degeneracies
+
+        Returns
+        -------
+        None.
+
+        """
         self.model.finalize (self)
             
     def _thetaLabels (self, thetaRange):
         """
-            thetaRange must be an array of integers
+        Internal function. thetaRange must be an array of integers
         """
         ret = []
         for theta in thetaRange:
@@ -115,6 +231,23 @@ class RWST:
         return ret
             
     def plot (self, names = []):
+        """
+        Plot of the selected set of RWST coefficients.
+        
+        Default behaviour plots layer 1 and layer 2 coefficients, and the reduced chi square values.
+
+        Parameters
+        ----------
+        names : list of str, optional
+            List of coefficients we want to plot on the same figure.
+            Can be "chi2r1" or "chi2r2" for reduced chi square values, or names included in model.nbParamsLayer1 and model.nbParamsLayer2 variables.
+            The default is [].
+
+        Returns
+        -------
+        None.
+
+        """
         if names == []:
             self.plot (names = self.model.layer1Names)
             self.plot (names = self.model.layer2Names)

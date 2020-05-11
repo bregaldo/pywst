@@ -11,7 +11,7 @@ class WST:
     
     def __init__ (self, J, L, coeffs, index = None, cplx = False):
         """
-        
+        Constructor.
 
         Parameters
         ----------
@@ -126,6 +126,28 @@ class WST:
             self.coeffs [i, ...] = coeffsCopy [reorderIndex [i], ...]
                 
     def _filterArgs (self, **kwargs):
+        """
+        Internal function to filter coefficients.
+
+        Parameters
+        ----------
+        layer : int, optional
+            Selection of the layer of coefficients (0, 1 or 2). The default is all layers.
+        j1 : int, optional
+            Selection of a specific j_1 values. The default is all j_1 values.
+        theta1 : int, optional
+            Selection of a specific theta_1 values. The default is all theta_1 values.
+        j2 : int, optional
+            Selection of a specific j_2 values. The default is all j_2 values.
+        theta2 : int, optional
+            Selection of a specific theta_2 values. The default is all theta_2 values.  
+
+        Returns
+        -------
+        filtering : array
+            Boolean array for coefficients selection.
+
+        """
         filtering = np.ones (self.index.shape [1], np.bool)
         for key, value in kwargs.items ():
             if key == "layer":
@@ -169,6 +191,32 @@ class WST:
         return self.coeffs [filtering, ...], self.index [:, filtering]
         
     def normalize (self, log2 = True):
+        """
+        Normalization of the coefficients and computation of logarithmic coefficients (binary logarithm).
+        
+        Layer 0 coefficients are left unchanged.
+        Layer 1 coefficients are normalized by layer 0 coefficients (locally if available):
+            
+        .. math::
+            
+            \\bar{S}_1(j_1,\\theta_1) = S_1(j_1,\\theta_1)/S_0
+            
+        Layer 2 coefficients are normalized by the corresponding layer 1 coefficients (locally if available):
+            
+        .. math::
+            
+            \\bar{S}_2(j_1,\\theta_1,j_2,\\theta_2) = S_2(j_1,\\theta_1,j_2,\\theta_2)/S_1(j_1,\\theta_1)
+
+        Parameters
+        ----------
+        log2 : TYPE, optional
+            Compute the binary logarithm of the normalized coefficients. The default is True.
+
+        Returns
+        -------
+        None.
+
+        """
         if self.coeffsCov is not None:
             print ("Warning! The covariance matrix has been computed before the normalization and will not be updated.")
         
@@ -191,6 +239,16 @@ class WST:
                 self.log2Vals = True
                 
     def average (self):
+        """
+        Computation of the mean coefficients and of the corresponding covariance matrix.
+        
+        This method needs batch data or local coefficients to be effective.
+
+        Returns
+        -------
+        None.
+
+        """
         if self.batch or self.local: # We need multiple samples to average
             coeffsCopy = self.coeffs.copy ()
             coeffsCopy = coeffsCopy.reshape ((coeffsCopy.shape [0], -1))
@@ -204,6 +262,33 @@ class WST:
             self.local = False
         
     def getCoeffsCov (self, autoRemoveOffDiagonalCoeffs = True, **args):
+        """
+        Return the covariance matrix corresponding to the selected coefficients.
+
+        Parameters
+        ----------
+        layer : int, optional
+            Selection of the layer of coefficients (0, 1 or 2). The default is all layers.
+        j1 : int, optional
+            Selection of a specific j_1 values. The default is all j_1 values.
+        theta1 : int, optional
+            Selection of a specific theta_1 values. The default is all theta_1 values.
+        j2 : int, optional
+            Selection of a specific j_2 values. The default is all j_2 values.
+        theta2 : int, optional
+            Selection of a specific theta_2 values. The default is all theta_2 values.
+        autoRemoveOffDiagonalCoeffs : bool, optional
+            If we need to guarantee the covariance matrix to be definite, we may need to remove off diagonal coefficients.
+            This is done when the effective number of samples to compute the sample covariance matrix is strictly lower than the dimension of the matrix plus one.
+            The default is True.
+
+        Returns
+        -------
+        array
+            Covariance matrix corresponding to the selected coefficients.
+        array
+            Index of the selected coefficients.
+        """
         filtering = self._filterArgs (**args)
         if self.coeffsCov is None:
             print ("Warning! Covariance matrix is None.")
@@ -218,6 +303,31 @@ class WST:
             return covM, self.index [:, filtering]
         
     def _plot (self, axis, x, y, ylabel, legend = "", err = None, j1Ticks = True):
+        """
+        Internal plot function.
+
+        Parameters
+        ----------
+        axis : matplotlib.axes.Axes
+            Axes object.
+        x : array
+            x values.
+        y : array
+            y values.
+        ylabel : str
+            Label of y-axis.
+        legend : str, optional
+            Label for the legend. The default is "".
+        err : array, optional
+            Error on the coefficients. The default is None.
+        j1Ticks : TYPE, optional
+            Do we want to show ticks for every j_1 value? The default is True.
+
+        Returns
+        -------
+        None.
+
+        """
         # Plot
         axis.plot (x, y, '-',  markersize = 2, label = legend)
         if err is not None:
@@ -262,6 +372,24 @@ class WST:
             axis.legend ()
         
     def plot (self, layer = None, j1 = None, title = "WST"):
+        """
+        Plot the WST coefficients.
+        Default behaviour plots both layer 1 and layer 2 full set of coefficients.
+        
+        Parameters
+        ----------
+        layer : int, optional
+            Layer of coefficients to plot (1 or 2). The default is None.
+        j1 : int, optional
+            Selection of coefficients for a specific j_1 value. The default is None.
+        title : str, optional
+            Title of the figures. The default is "WST".
+
+        Returns
+        -------
+        None.
+
+        """
         xValues = np.array (range (self.nbM0 + self.nbM1 + self.nbM2))
 
         locShape = self.coeffs.shape [1:]

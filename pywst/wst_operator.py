@@ -13,7 +13,7 @@ class WSTOp:
     
     def __init__ (self, M, N, J, L = 8, OS = 0, cplx = False):
         """
-        
+        Constructor.
 
         Parameters
         ----------

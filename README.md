@@ -3,7 +3,7 @@ pywst : WST and RWST for astrophysics
 
 This package is designed to easily perform WST and RWST analysis for astrophysical data.
 
-# INSTALL & UNINSTALL
+# Install/Uninstall
 
 ## Install from source
 
@@ -19,13 +19,13 @@ pip install pywst
 
 pip uninstall pywst
 
-# TODO
+# Todo
 
-- Add Sphinx documentation.
+- Configure Sphinx documentation.
 - Upload package to the Python Package Index.
 - Set the repository public.
 
-# CHANGELOG
+# Changelog
 
 ## 0.1 [coming...]
 

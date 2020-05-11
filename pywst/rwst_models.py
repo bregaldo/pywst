@@ -4,8 +4,24 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 class RWSTModelBase (ABC):
+    """
+    Base class for the definition of a RWST model, i.e. a model of the angular dependencies of the WST coefficients.
+    """
 
     def __init__ (self, L):
+        """
+        Constructor.
+
+        Parameters
+        ----------
+        L : int
+            Number of angles between 0 and pi.
+
+        Returns
+        -------
+        None.
+
+        """
         self.L = L
         self.model = self.__class__.__name__
         self.layer1Names = []
@@ -17,19 +33,66 @@ class RWSTModelBase (ABC):
         
     @abstractmethod
     def layer1 (self, thetaVals, *params):
+        """
+        Model for layer 1 coefficients.
+
+        Parameters
+        ----------
+        thetaVals : array
+            theta_1 values.
+        *params : float
+            Parameters of the model.
+
+        Returns
+        -------
+        array
+            Predictions of the model.
+
+        """
         theta1 = thetaVals
         pass
     
     @abstractmethod
     def layer2 (self, thetaVals, *params):
+        """
+        Model for layer 2 coefficients.
+
+        Parameters
+        ----------
+        thetaVals : (array, array)
+            (theta_1,theta_2) values.
+        *params : float
+            Parameters of the model.
+
+        Returns
+        -------
+        array
+            Predictions of the model.
+        """
         theta1, theta2 = thetaVals
         pass
 
     @abstractmethod
     def finalize (self, rwst):
+        """
+        Potential finalization steps on the RWST coefficients.
+
+        Parameters
+        ----------
+        rwst : RWST
+            RWST object to finalize.
+
+        Returns
+        -------
+        None.
+
+        """
         pass
 
 class RWSTModel1 (RWSTModelBase):
+    """
+    Usual RWST model (without additional terms).
+    """
     
     def __init__ (self, L):
         super ().__init__ (L)
@@ -104,6 +167,9 @@ class RWSTModel1 (RWSTModelBase):
                         rwst.coeffs ['m2'][(j1, j2, indexThetaRef2) + locIndex] += self.L
 
 class RWSTModel2 (RWSTModelBase):
+    """
+    RWST model that takes into account additional terms such as lattice terms and S2Iso3 term.
+    """
     
     def __init__ (self, L):
         super ().__init__ (L)
