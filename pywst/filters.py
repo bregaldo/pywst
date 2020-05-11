@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# This source file is inspired from the Kymatio project: https://www.kymat.io/index.html
 
 import numpy as np
 
