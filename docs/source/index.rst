@@ -6,10 +6,12 @@
 Welcome to pywst's documentation!
 =================================
 
+Contents:
+
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
+   pywst
 
 
 Indices and tables
@@ -18,3 +20,5 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+
