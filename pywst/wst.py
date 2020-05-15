@@ -2,6 +2,7 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.ma as ma
 
 class WST:
     """
@@ -252,11 +253,19 @@ class WST:
         if self.batch or self.local: # We need multiple samples to average
             coeffsCopy = self.coeffs.copy ()
             coeffsCopy = coeffsCopy.reshape ((coeffsCopy.shape [0], -1))
-            coeffsCov = np.cov (coeffsCopy) / coeffsCopy.shape [-1]
+            
+            # How many valid samples do we have? (assumed to be the same for every coefficient)
+            samples = 0
+            if type (coeffsCopy) == ma.MaskedArray: # Do we have any masked value?
+                samples = coeffsCopy [0].count  (axis = -1) # We use S0 coefficient as it should be the same for any other coefficient
+            else:
+                samples = coeffsCopy.shape [-1]
+                
+            coeffsCov = ma.cov (coeffsCopy) / samples # Masked array covariance function to properly handle masked coefficients.
             
             self.coeffs = coeffsCopy.mean (axis = -1)
             self.coeffsCov = coeffsCov
-            self.coeffsCovNbSamples = coeffsCopy.shape [-1] # Keep in memory the number of samples used to compute the sample covariance matrix.
+            self.coeffsCovNbSamples = samples # Keep in memory the number of samples used to compute the sample covariance matrix.
             
             self.batch = False
             self.local = False
@@ -392,7 +401,12 @@ class WST:
         """
         xValues = np.array (range (self.nbM0 + self.nbM1 + self.nbM2))
 
+        # Get the shape of the local information (batch + local coefficients per map)
         locShape = self.coeffs.shape [1:]
+        # Get a mask associated to S0 coefficient if any local coefficient turns out to be masked (we assume uniform mask along coefficient index axis).
+        mask = ma.getmaskarray (self.coeffs [0])
+        # Define an index of local positions that are not masked.
+        validLocIndex = [loc for loc in np.ndindex (locShape) if mask [loc] == False]
    
         if layer is None or layer == 1:
             if j1 is None:
@@ -405,7 +419,7 @@ class WST:
             
             fig = plt.figure ()
             ax = fig.add_subplot (1,1,1)
-            for locIndex in np.ndindex (locShape):
+            for locIndex in validLocIndex:
                 coeffs = self.coeffs [tuple ([xSelection]) + locIndex]
                 if self.coeffsCov is None:
                     coeffsErr = None
@@ -425,7 +439,7 @@ class WST:
             
             fig = plt.figure (figsize = (30, 5))
             ax = fig.add_subplot (1,1,1)
-            for locIndex in np.ndindex (locShape):
+            for locIndex in validLocIndex:
                 coeffs = self.coeffs [tuple ([xSelection]) + locIndex]
                 if self.coeffsCov is None:
                     coeffsErr = None

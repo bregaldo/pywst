@@ -2,6 +2,7 @@
 # This source file is inspired from the Kymatio project: https://www.kymat.io/index.html
 
 import numpy as np
+import numpy.ma as ma
 from .filters import MorletWavelet, GaussianFilter
 from .utils import fft, ifft, subsampleFourier, modulus
 from .wst import WST
@@ -11,9 +12,11 @@ class WSTOp:
     Wavelet Scattering Transform (WST) operator.
     """
     
-    def __init__ (self, M, N, J, L = 8, OS = 0, cplx = False):
+    def __init__ (self, M, N, J, L = 8, OS = 0, cplx = False, lf_filter_cls = GaussianFilter, bp_filter_cls = MorletWavelet):
         """
         Constructor.
+        
+        M and N must be proportional to 2^J.
 
         Parameters
         ----------
@@ -35,10 +38,13 @@ class WSTOp:
         None.
 
         """
-        self.M, self.N, self.J, self.L, self.OS, self.cplx = M, N, J, L, OS, cplx
-        self.loadFilters ()
+        if M % 2 ** J != 0 or N % 2 ** J != 0:
+            raise Exception ("Choose values for M and N that are proportional to 2^J.")
         
-    def loadFilters (self):
+        self.M, self.N, self.J, self.L, self.OS, self.cplx = M, N, J, L, OS, cplx
+        self.loadFilters (lf_filter_cls, bp_filter_cls)
+        
+    def loadFilters (self, lf_filter_cls, bp_filter_cls):
         """
         Build the set of low pass and bandpass filters that are used for the transform.
         Low pass filters correspond to Gaussian filters.
@@ -61,7 +67,7 @@ class WSTOp:
         for j in range (self.J):
             for theta in range (self.L):
                 self.psi [j, theta] = {}
-                w = MorletWavelet (self.M, self.N, j, (self.L // 2 - theta) * np.pi / self.L, gamma, sigma0, k0).data
+                w = bp_filter_cls (self.M, self.N, j, (self.L // 2 - theta) * np.pi / self.L, gamma, sigma0, k0).data
                 wF = fft (w).real # The imaginary part is null for Morlet wavelets
                 for res in range (j + 1):
                     self.psi [j, theta][res] = subsampleFourier (wF, 2 ** res, normalize = True)
@@ -73,12 +79,12 @@ class WSTOp:
                         self.psi [j, theta + self.L][res] = fft (np.conjugate (ifft (self.psi [j, theta][res]))).real
         
         # Build phi filters
-        g = GaussianFilter (self.M, self.N, self.J - 1, sigma0 = sigma0).data
+        g = lf_filter_cls (self.M, self.N, self.J - 1, sigma0 = sigma0).data
         gF = np.real (fft (g)) # The imaginary part is null for Gaussian filters
         for res in range (self.J):
             self.phi [res] = subsampleFourier (gF, 2 ** res, normalize = True)
     
-    def apply (self, data, local = False):
+    def apply (self, data, local = False, crop = 0.0):
         """
         Compute the WST of input data.
         
@@ -90,6 +96,9 @@ class WSTOp:
             Input data. 2D (one image) or 3D array (batch of images).
         local : bool, optional
             Do we need local coefficients? The default is False.
+        crop : float, optional
+            For non-periodic images, local coefficients at the borders may need to be cropped.
+            Width of the cropping in 2^J pixels unit before downsampling (i.e. crop = 1 corresponds to 2^J pixels cropped before downsampling).
 
         Raises
         ------
@@ -116,6 +125,11 @@ class WSTOp:
         
         if np.isrealobj (data):  # We make sure that data do not contain any complex value
             locCplx = False # We do not need the whole set of WST coefficients for real data
+            
+        # Check input images shape
+        imgShape = (data.shape [-2], data.shape [-1])
+        if imgShape [0] != self.M or imgShape [1] != self.N:
+            raise Exception ("Inconsistent width and height of the input images with the parameters of this operator.")
 
         # Output lists
         S = []
@@ -168,4 +182,18 @@ class WSTOp:
                             S.append (S2.mean (axis = (-1, -2)))
                         SIndex.append ([2, j1, theta1, j2, theta2])
                         
-        return WST (J, L, np.array (S), index = np.array (SIndex).T, cplx = locCplx)
+        S = np.array (S)
+        
+        # Cropping of the local coefficients at the border of the input images
+        if local and crop != 0.0:
+            mask = np.zeros (S.shape, bool)
+            for i in range (self.M // 2 ** (J - OS)):
+                for j in range (self.N // 2 ** (J - OS)):
+                    if i < int (crop * 2 ** OS) or i > self.M // 2 ** (J - OS) - int (crop * 2 ** OS) \
+                       or j < int (crop * 2 ** OS) or j > self.N // 2 ** (J - OS) - int (crop * 2 ** OS):
+                        mask [..., i, j] = True
+            if np.sum (~mask) == 0:
+                raise Exception ("No valid data remains after cropping.")
+            S = ma.MaskedArray (S, mask = mask) # We create a numpy masked array to mask the cropped coefficients.
+                        
+        return WST (J, L, S, index = np.array (SIndex).T, cplx = locCplx)

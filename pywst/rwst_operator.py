@@ -3,6 +3,7 @@
 import numpy as np
 import scipy.optimize as opt
 import numpy.linalg as la
+import numpy.ma as ma
 
 from .wst import WST
 from .wst_operator import WSTOp
@@ -78,8 +79,14 @@ class RWSTOp:
             wst.normalize (log2 = True)
             if not local:
                 wst.average ()
-                
-        locShape = wst.coeffs.shape [1:] # Shape of the local information (batch + local coefficients per map)
+        
+        # Get the shape of the local information (batch + local coefficients per map)
+        locShape = wst.coeffs.shape [1:]
+        # Get a mask associated to S0 coefficient if any local coefficient turns out to be masked (we assume uniform mask along coefficient index axis).
+        mask = ma.getmaskarray (wst.coeffs [0])
+        # Define an index of local positions that are not masked.
+        validLocIndex = [loc for loc in np.ndindex (locShape) if mask [loc] == False]
+        
         model = self.model (self.L)
         rwst = RWST (self.J, self.L, model, locShape = locShape)
         
@@ -97,7 +104,7 @@ class RWSTOp:
             paramsOpt = np.zeros ((model.nbParamsLayer1,) + locShape)
             paramsCov = np.zeros ((model.nbParamsLayer1,model.nbParamsLayer1) + locShape)
             chi2r = np.zeros (locShape)
-            for locIndex in np.ndindex (locShape): # Enumerate the index values corresponding to the shape locShape
+            for locIndex in validLocIndex: # Enumerate the index values corresponding to the shape locShape
                 # In the following, np.index_exp helps to concatenate slice() object and tuples.
                 # We get the optimized parameters paramsOpt and their corresponding covariance matrix. paramsOpt minimizes the chi squared statistics.
                 paramsOpt [np.index_exp [:] + locIndex], paramsCov [np.index_exp [:,:] + locIndex] = opt.curve_fit (model.layer1, theta1Vals, coeffs [np.index_exp [:] + locIndex], p0 = np.ones (model.nbParamsLayer1), sigma = coeffsCov)
@@ -115,7 +122,7 @@ class RWSTOp:
                 paramsOpt = np.zeros ((model.nbParamsLayer2,) + locShape)
                 paramsCov = np.zeros ((model.nbParamsLayer2,model.nbParamsLayer2) + locShape)
                 chi2r = np.zeros (locShape)
-                for locIndex in np.ndindex (locShape): # Enumerate the index values corresponding to the shape locShape
+                for locIndex in validLocIndex: # Enumerate the index values corresponding to the shape locShape
                     # In the following, np.index_exp helps to concatenate slice() object and tuples.
                     # We get the optimized parameters paramsOpt and their corresponding covariance matrix. paramsOpt minimizes the chi squared statistics.
                     paramsOpt [np.index_exp [:] + locIndex], paramsCov [np.index_exp [:,:] + locIndex] = opt.curve_fit (model.layer2, thetaVals, coeffs [np.index_exp [:] + locIndex], p0 = np.ones (model.nbParamsLayer2), sigma = coeffsCov)
@@ -124,5 +131,8 @@ class RWSTOp:
                 rwst._setCoeffs (2, (j1, j2), paramsOpt, paramsCov, chi2r)
         
         rwst._finalize () # Deal with potential model parameters degeneracies
+        
+        if mask.sum () != 0: # We have at least one masked value
+            rwst._set_mask (mask) # Same mask as wst data
         
         return rwst

@@ -2,6 +2,7 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.ma as ma
 
 class RWST:
     """
@@ -40,9 +41,37 @@ class RWST:
         self.coeffs ['m0'] = np.zeros ((1,) + locShape)
         self.coeffs ['m1'] = np.zeros ((J, model.nbParamsLayer1 + 1) + locShape)       # +1 to add chi2r coefficients
         self.coeffs ['m2'] = np.zeros ((J, J, model.nbParamsLayer2 + 1) + locShape)    # +1 to add chi2r coefficients
-        self.coeffsCov ['m0'] = np.zeros ((1, 1) + locShape)
+        self.coeffsCov ['m0'] = np.zeros ((1, 1) + locShape) # Actually, it is not possible yet to get local information for this m0 covariance matrix.
         self.coeffsCov ['m1'] = np.zeros ((J, model.nbParamsLayer1, model.nbParamsLayer1) + locShape)
         self.coeffsCov ['m2'] = np.zeros ((J, J, model.nbParamsLayer2, model.nbParamsLayer2) + locShape)
+        
+    def _set_mask (self, mask):
+        """
+        Use MaskedArray objects to deal with masked values when applicable.
+
+        Parameters
+        ----------
+        mask : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.coeffs ['m0'] = ma.MaskedArray (self.coeffs ['m0'])
+        self.coeffs ['m0'][:, mask] = ma.masked
+        self.coeffs ['m1'] = ma.MaskedArray (self.coeffs ['m1'])
+        self.coeffs ['m1'][:, :, mask] = ma.masked
+        self.coeffs ['m2'] = ma.MaskedArray (self.coeffs ['m2'])
+        self.coeffs ['m2'][:, :, :, mask] = ma.masked
+        self.coeffsCov ['m0'] = ma.MaskedArray (self.coeffsCov ['m0'])
+        if self.coeffsCov ['m0'][0, 0].shape == mask.shape: # Special case for m0 rwst coefficient as it is not possible for now to get local information.
+            self.coeffsCov ['m0'][:, :, mask] = ma.masked
+        self.coeffsCov ['m1'] = ma.MaskedArray (self.coeffsCov ['m1'])
+        self.coeffsCov ['m1'][:, :, :, mask] = ma.masked
+        self.coeffsCov ['m2'] = ma.MaskedArray (self.coeffsCov ['m2'])
+        self.coeffsCov ['m2'][:, :, :, :, mask] = ma.masked
 
     def _setCoeffs (self, layer, jVals, coeffs, coeffsCov, chi2r):
         """
@@ -266,6 +295,10 @@ class RWST:
                     if name == nameList: indexLayer2.append (index)
                     
             locShape = self.coeffs ['m0'].shape [1:]
+             # Get a mask associated to S0 coefficient if any local coefficient turns out to be masked (we assume uniform mask along coefficient index axis).
+            mask = ma.getmaskarray (self.coeffs ['m0'] [0])
+            # Define an index of local positions that are not masked.
+            validLocIndex = [loc for loc in np.ndindex (locShape) if mask [loc] == False]
             
             colorCycle = plt.rcParams['axes.prop_cycle'].by_key ()['color']
                     
@@ -286,7 +319,7 @@ class RWST:
                     
                 if index < len (indexLayer1):
                     index = indexLayer1 [index]
-                    for locIndex in np.ndindex (locShape):
+                    for locIndex in validLocIndex:
                         coeffs = self.coeffs ['m1'][np.index_exp [:, index] + locIndex]
                         if index != self.model.nbParamsLayer1: # No std for chi2r1
                             coeffsStd = np.sqrt (self.coeffsCov ['m1'][np.index_exp [:, index, index] + locIndex])
@@ -306,7 +339,7 @@ class RWST:
                         axs [pos].set_ylabel (r"$\chi^{2, \mathrm{S_1}}_\mathrm{r}(j_1)$")
                 elif index < len (indexLayer1) + len (indexLayer2):
                     index = indexLayer2 [index - len (indexLayer1)]
-                    for locNum, locIndex in enumerate (np.ndindex (locShape)):
+                    for locNum, locIndex in enumerate (validLocIndex):
                         color = colorCycle [locNum % len (colorCycle)]
                         coeffs = self.coeffs ['m2'][np.index_exp [:, :, index] + locIndex]
                         if index != self.model.nbParamsLayer2: # No std for chi2r2

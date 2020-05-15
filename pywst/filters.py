@@ -2,6 +2,7 @@
 # This source file is inspired from the Kymatio project: https://www.kymat.io/index.html
 
 import numpy as np
+from scipy import ndimage
 
 class Filter:
     """
@@ -131,6 +132,56 @@ class GaussianFilter (Filter):
         normFactor = 2 * np.pi * self.sigma ** 2 / self.gamma
         self.data /= normFactor
         
+class TopHatFilter (Filter):
+    """
+    Top-hat filter.
+    """
+    
+    def __init__ (self, M, N, j, theta = 0.0, gamma = 1.0, sigma0 = 1.0):
+        """
+        Constructor.
+
+        Parameters
+        ----------
+        M : int
+            Height.
+        N : int
+            Width.
+        j : int
+            Dyadic scale index.
+        theta : float, optional
+            Rotation angle. The default is 0.0.
+        gamma : float, optional
+            Aspect ratio of the envelope. The default is 1.0.
+        sigma0 : float, optional
+            Standard deviation of the envelope before its dilation. The default is 1.0.
+
+        Returns
+        -------
+        None.
+
+        """
+        super ().__init__ (M, N)
+        self.data = np.zeros ((M, N)) # No need for a complex data type
+        self.j = j
+        self.theta = theta
+        self.gamma = gamma
+        self.sigma0 = sigma0
+        self.sigma = self.sigma0 * 2 ** j
+        self.build ()
+        
+    def build (self):
+        """ 
+        Build the filter for a given set of parameters.
+        """
+        
+        [xx, yy] = np.mgrid [0:self.M, 0:self.N]
+        self.data = ((xx - self.M // 2) ** 2 + ((yy - self.N // 2) * self.gamma) ** 2 <= self.sigma ** 2).astype (float)
+        
+        self.data = np.fft.fftshift (ndimage.rotate (self.data, self.theta / np.pi * 180.0))
+                
+        self.data /= np.sum (self.data)
+        
 class Wavelet (Filter):
     """
     Base class for wavelets.
@@ -159,7 +210,6 @@ class MorletWavelet (Wavelet):
         N : int
             Width.
         j : int
-        sigma0 : float, optional
             Dyadic scale index.
         theta : float
             Rotation angle.
