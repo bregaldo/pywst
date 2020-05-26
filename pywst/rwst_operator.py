@@ -10,12 +10,13 @@ from .wst_operator import WSTOp
 from .rwst import RWST
 from .rwst_models import RWSTModel1
 
+
 class RWSTOp:
     """
     Reduced Wavelet Scattering Transform (RWST) operator.
     """
     
-    def __init__ (self, M, N, J, L = 8, OS = 0, cplx = False, model = RWSTModel1):
+    def __init__(self, M, N, J, L=8, OS=0, cplx=False, model=RWSTModel1):
         """
         Constructor.
         
@@ -41,10 +42,10 @@ class RWSTOp:
         None.
         """
         self.M, self.N, self.J, self.L, self.OS, self.cplx = M, N, J, L, OS, cplx
-        self.wstOp = WSTOp (M, N, J, L, OS, cplx)
+        self.wstOp = WSTOp(M, N, J, L, OS, cplx)
         self.model = model
     
-    def apply (self, data, local = False):
+    def apply(self, data, local=False):
         """
         Compute the RWST of input data or from a set of pre-computed WST coefficients.
         
@@ -70,69 +71,69 @@ class RWSTOp:
 
         """
         # Check if data is made of images or is directly a WST object.
-        if type (data) == WST:
+        if type(data) == WST:
             wst = data
             if wst.J != self.J:
-                raise Exception ("Inconsistent J values between RWST operator and input WST coefficients.")
+                raise Exception("Inconsistent J values between RWST operator and input WST coefficients.")
         else:
-            wst = self.wstOp.apply (data, local)
-            wst.normalize (log2 = True)
+            wst = self.wstOp.apply(data, local)
+            wst.normalize(log2=True)
             if not local:
-                wst.average ()
+                wst.average()
         
         # Get the shape of the local information (batch + local coefficients per map)
-        locShape = wst.coeffs.shape [1:]
+        locShape = wst.coeffs.shape[1:]
         # Get a mask associated to S0 coefficient if any local coefficient turns out to be masked (we assume uniform mask along coefficient index axis).
-        mask = ma.getmaskarray (wst.coeffs [0])
+        mask = ma.getmaskarray(wst.coeffs[0])
         # Define an index of local positions that are not masked.
-        validLocIndex = [loc for loc in np.ndindex (locShape) if mask [loc] == False]
+        validLocIndex = [loc for loc in np.ndindex(locShape) if mask[loc] == False]
         
-        model = self.model (self.L)
-        rwst = RWST (self.J, self.L, model, locShape = locShape)
+        model = self.model(self.L)
+        rwst = RWST(self.J, self.L, model, locShape=locShape)
         
         # Layer 0 coefficient
-        coeffs, coeffsIndex = wst.getCoeffs (layer = 0)
-        coeffsCov, coeffsIndex = wst.getCoeffsCov (layer = 0)
-        rwst._setCoeffs (0, None, coeffs, coeffsCov, None)
+        coeffs, coeffsIndex = wst.get_coeffs(layer=0)
+        coeffsCov, coeffsIndex = wst.get_coeffs_cov(layer=0)
+        rwst._set_coeffs(0, None, coeffs, coeffsCov, None)
 
         # Layer 1 coefficients
-        for j1 in range (self.J):
-            coeffs, coeffsIndex = wst.getCoeffs (layer = 1, j1 = j1)
-            coeffsCov, coeffsIndex = wst.getCoeffsCov (layer = 1, j1 = j1)
-            theta1Vals = coeffsIndex [2]
+        for j1 in range(self.J):
+            coeffs, coeffsIndex = wst.get_coeffs(layer=1, j1=j1)
+            coeffsCov, coeffsIndex = wst.get_coeffs_cov(layer=1, j1=j1)
+            theta1Vals = coeffsIndex[2]
             
-            paramsOpt = np.zeros ((model.nbParamsLayer1,) + locShape)
-            paramsCov = np.zeros ((model.nbParamsLayer1,model.nbParamsLayer1) + locShape)
-            chi2r = np.zeros (locShape)
+            paramsOpt = np.zeros((model.nbParamsLayer1,) + locShape)
+            paramsCov = np.zeros((model.nbParamsLayer1, model.nbParamsLayer1) + locShape)
+            chi2r = np.zeros(locShape)
             for locIndex in validLocIndex: # Enumerate the index values corresponding to the shape locShape
                 # In the following, np.index_exp helps to concatenate slice() object and tuples.
                 # We get the optimized parameters paramsOpt and their corresponding covariance matrix. paramsOpt minimizes the chi squared statistics.
-                paramsOpt [np.index_exp [:] + locIndex], paramsCov [np.index_exp [:,:] + locIndex] = opt.curve_fit (model.layer1, theta1Vals, coeffs [np.index_exp [:] + locIndex], p0 = np.ones (model.nbParamsLayer1), sigma = coeffsCov)
-                x = coeffs [np.index_exp [:] + locIndex] - model.layer1 (theta1Vals, *tuple (paramsOpt [np.index_exp [:] + locIndex]))
-                chi2r [locIndex] = x.T @ la.inv (coeffsCov) @ x  / (len (x) - model.nbParamsLayer1)
-            rwst._setCoeffs (1, j1, paramsOpt, paramsCov, chi2r)
+                paramsOpt[np.index_exp[:] + locIndex], paramsCov[np.index_exp[:, :] + locIndex] = opt.curve_fit(model.layer1, theta1Vals, coeffs[np.index_exp[:] + locIndex], p0=np.ones(model.nbParamsLayer1), sigma=coeffsCov)
+                x = coeffs[np.index_exp[:] + locIndex] - model.layer1(theta1Vals, *tuple(paramsOpt[np.index_exp[:] + locIndex]))
+                chi2r[locIndex] = x.T @ la.inv(coeffsCov) @ x / (len(x) - model.nbParamsLayer1)
+            rwst._set_coeffs(1, j1, paramsOpt, paramsCov, chi2r)
             
         # Layer 2 coefficients
-        for j1 in range (self.J):
-            for j2 in range (j1 + 1, self.J):
-                coeffs, coeffsIndex = wst.getCoeffs (layer = 2, j1 = j1, j2 = j2)
-                coeffsCov, coeffsIndex = wst.getCoeffsCov (layer = 2, j1 = j1, j2 = j2)
-                thetaVals = (coeffsIndex [2], coeffsIndex [4])
+        for j1 in range(self.J):
+            for j2 in range(j1 + 1, self.J):
+                coeffs, coeffsIndex = wst.get_coeffs(layer=2, j1=j1, j2=j2)
+                coeffsCov, coeffsIndex = wst.get_coeffs_cov(layer=2, j1=j1, j2=j2)
+                thetaVals = (coeffsIndex[2], coeffsIndex[4])
                 
-                paramsOpt = np.zeros ((model.nbParamsLayer2,) + locShape)
-                paramsCov = np.zeros ((model.nbParamsLayer2,model.nbParamsLayer2) + locShape)
-                chi2r = np.zeros (locShape)
+                paramsOpt = np.zeros((model.nbParamsLayer2,) + locShape)
+                paramsCov = np.zeros((model.nbParamsLayer2, model.nbParamsLayer2) + locShape)
+                chi2r = np.zeros(locShape)
                 for locIndex in validLocIndex: # Enumerate the index values corresponding to the shape locShape
                     # In the following, np.index_exp helps to concatenate slice() object and tuples.
                     # We get the optimized parameters paramsOpt and their corresponding covariance matrix. paramsOpt minimizes the chi squared statistics.
-                    paramsOpt [np.index_exp [:] + locIndex], paramsCov [np.index_exp [:,:] + locIndex] = opt.curve_fit (model.layer2, thetaVals, coeffs [np.index_exp [:] + locIndex], p0 = np.ones (model.nbParamsLayer2), sigma = coeffsCov)
-                    x = coeffs [np.index_exp [:] + locIndex] - model.layer2 (thetaVals, *tuple (paramsOpt [np.index_exp [:] + locIndex]))
-                    chi2r [locIndex] = x.T @ la.inv (coeffsCov) @ x  / (len (x) - model.nbParamsLayer2)
-                rwst._setCoeffs (2, (j1, j2), paramsOpt, paramsCov, chi2r)
+                    paramsOpt[np.index_exp[:] + locIndex], paramsCov[np.index_exp[:, :] + locIndex] = opt.curve_fit(model.layer2, thetaVals, coeffs[np.index_exp[:] + locIndex], p0=np.ones(model.nbParamsLayer2), sigma=coeffsCov)
+                    x = coeffs[np.index_exp[:] + locIndex] - model.layer2(thetaVals, *tuple(paramsOpt[np.index_exp[:] + locIndex]))
+                    chi2r[locIndex] = x.T @ la.inv(coeffsCov) @ x / (len(x) - model.nbParamsLayer2)
+                rwst._set_coeffs(2, (j1, j2), paramsOpt, paramsCov, chi2r)
         
-        rwst._finalize () # Deal with potential model parameters degeneracies
+        rwst._finalize() # Deal with potential model parameters degeneracies
         
-        if mask.sum () != 0: # We have at least one masked value
-            rwst._set_mask (mask) # Same mask as wst data
+        if mask.sum() != 0: # We have at least one masked value
+            rwst._set_mask(mask) # Same mask as wst data
         
         return rwst

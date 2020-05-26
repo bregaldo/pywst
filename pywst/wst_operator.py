@@ -4,15 +4,16 @@
 import numpy as np
 import numpy.ma as ma
 from .filters import MorletWavelet, GaussianFilter
-from .utils import fft, ifft, subsampleFourier, modulus
+from .utils import fft, ifft, subsample_fourier, modulus
 from .wst import WST
+
 
 class WSTOp:
     """
     Wavelet Scattering Transform (WST) operator.
     """
     
-    def __init__ (self, M, N, J, L = 8, OS = 0, cplx = False, lf_filter_cls = GaussianFilter, bp_filter_cls = MorletWavelet):
+    def __init__(self, M, N, J, L=8, OS=0, cplx=False, lf_filter_cls=GaussianFilter, bp_filter_cls=MorletWavelet):
         """
         Constructor.
         
@@ -39,12 +40,12 @@ class WSTOp:
 
         """
         if M % 2 ** J != 0 or N % 2 ** J != 0:
-            raise Exception ("Choose values for M and N that are proportional to 2^J.")
+            raise Exception("Choose values for M and N that are proportional to 2^J.")
         
         self.M, self.N, self.J, self.L, self.OS, self.cplx = M, N, J, L, OS, cplx
-        self.loadFilters (lf_filter_cls, bp_filter_cls)
+        self.load_filters(lf_filter_cls, bp_filter_cls)
         
-    def loadFilters (self, lf_filter_cls, bp_filter_cls):
+    def load_filters(self, lf_filter_cls, bp_filter_cls):
         """
         Build the set of low pass and bandpass filters that are used for the transform.
         Low pass filters correspond to Gaussian filters.
@@ -64,27 +65,27 @@ class WSTOp:
         k0 = 3 * np.pi / 4  # Central wavenumber of the mother wavelet
         
         # Build psi filters
-        for j in range (self.J):
-            for theta in range (self.L):
-                self.psi [j, theta] = {}
-                w = bp_filter_cls (self.M, self.N, j, (self.L // 2 - theta) * np.pi / self.L, gamma, sigma0, k0).data
-                wF = fft (w).real # The imaginary part is null for Morlet wavelets
-                for res in range (j + 1):
-                    self.psi [j, theta][res] = subsampleFourier (wF, 2 ** res, normalize = True)
+        for j in range(self.J):
+            for theta in range(self.L):
+                self.psi[j, theta] = {}
+                w = bp_filter_cls(self.M, self.N, j, (self.L // 2 - theta) * np.pi / self.L, gamma, sigma0, k0).data
+                wF = fft(w).real # The imaginary part is null for Morlet wavelets
+                for res in range(j + 1):
+                    self.psi[j, theta][res] = subsample_fourier(wF, 2 ** res, normalize=True)
             if self.cplx: # We also need rotations for theta in [pi, 2*pi)
-                for theta in range (self.L):
-                    self.psi [j, theta + self.L] = {}
-                    for res in range (j + 1):
+                for theta in range(self.L):
+                    self.psi[j, theta + self.L] = {}
+                    for res in range(j + 1):
                         # Optimization trick for Morlet wavelets
-                        self.psi [j, theta + self.L][res] = fft (np.conjugate (ifft (self.psi [j, theta][res]))).real
+                        self.psi[j, theta + self.L][res] = fft(np.conjugate(ifft(self.psi[j, theta][res]))).real
         
         # Build phi filters
-        g = lf_filter_cls (self.M, self.N, self.J - 1, sigma0 = sigma0).data
-        gF = np.real (fft (g)) # The imaginary part is null for Gaussian filters
-        for res in range (self.J):
-            self.phi [res] = subsampleFourier (gF, 2 ** res, normalize = True)
+        g = lf_filter_cls(self.M, self.N, self.J - 1, sigma0=sigma0).data
+        gF = np.real(fft(g)) # The imaginary part is null for Gaussian filters
+        for res in range(self.J):
+            self.phi[res] = subsample_fourier(gF, 2 ** res, normalize=True)
     
-    def apply (self, data, local = False, crop = 0.0):
+    def apply(self, data, local=False, crop=0.0):
         """
         Compute the WST of input data.
         
@@ -121,79 +122,79 @@ class WSTOp:
         
         # Check if we are dealing with a batch of images or not.
         if not (data.ndim == 2 or data.ndim == 3):
-            raise Exception ("Bad input shape.")
+            raise Exception("Bad input shape.")
         
-        if np.isrealobj (data):  # We make sure that data do not contain any complex value
+        if np.isrealobj(data):  # We make sure that data do not contain any complex value
             locCplx = False # We do not need the whole set of WST coefficients for real data
             
         # Check input images shape
-        imgShape = (data.shape [-2], data.shape [-1])
-        if imgShape [0] != self.M or imgShape [1] != self.N:
-            raise Exception ("Inconsistent width and height of the input images with the parameters of this operator.")
+        imgShape = (data.shape[-2], data.shape[-1])
+        if imgShape[0] != self.M or imgShape[1] != self.N:
+            raise Exception("Inconsistent width and height of the input images with the parameters of this operator.")
 
         # Output lists
         S = []
         SIndex = [] # Index of the coefficients of shape (5, nbCoeffs). Axis 0 order corresponds to: Layer, j1, theta1, j2, theta2
         
         # Zeroth layer
-        U0 = fft (data)
+        U0 = fft(data)
         resU0 = 0
         if local:
-            S0 = ifft (subsampleFourier (U0 * phi [0], 2 ** max (J - OS, 0)))
+            S0 = ifft(subsample_fourier(U0 * phi[0], 2 ** max(J - OS, 0)))
         else:
-            S0 = ifft (U0)
+            S0 = ifft(U0)
         if locCplx:
-            S0 = modulus (S0)
+            S0 = modulus(S0)
         else:
             S0 = S0.real # Discard the null imaginary part
         if local:
-            S.append (S0)
+            S.append(S0)
         else:
-            S.append (S0.mean (axis = (-1, -2)))
-        SIndex.append ([0, 0, 0, 0, 0])
+            S.append(S0.mean(axis=(-1, -2)))
+        SIndex.append([0, 0, 0, 0, 0])
     
         # First layer
-        for j1 in range (J):
-            for theta1 in range ((locCplx + 1) * L): # Note the trick to produce 2 when locCplx == True, and 1 otherwise
-                U1 = subsampleFourier (U0 * psi [j1, theta1][resU0], 2 ** max (j1 - resU0 - OS, 0))
-                U1 = fft (modulus (ifft (U1)))
-                resU1 = resU0 + max (j1 - resU0 - OS, 0)
+        for j1 in range(J):
+            for theta1 in range((locCplx + 1) * L): # Note the trick to produce 2 when locCplx == True, and 1 otherwise
+                U1 = subsample_fourier(U0 * psi[j1, theta1][resU0], 2 ** max(j1 - resU0 - OS, 0))
+                U1 = fft(modulus(ifft(U1)))
+                resU1 = resU0 + max(j1 - resU0 - OS, 0)
                 
                 if local:
-                    S1 = ifft (subsampleFourier (U1 * phi [resU1], 2 ** (max (J - resU1 - OS, 0)))).real
-                    S.append (S1)
+                    S1 = ifft(subsample_fourier(U1 * phi[resU1], 2 ** (max(J - resU1 - OS, 0)))).real
+                    S.append(S1)
                 else:
-                    S1 = ifft (U1).real
-                    S.append (S1.mean (axis = (-1, -2)))
-                SIndex.append ([1, j1, theta1, 0, 0])
+                    S1 = ifft(U1).real
+                    S.append(S1.mean(axis=(-1, -2)))
+                SIndex.append([1, j1, theta1, 0, 0])
             
                 # Second layer
-                for j2 in range (j1 + 1, J):
-                    for theta2 in range (L):
-                        U2 = subsampleFourier (U1 * psi [j2, theta2][resU1], 2 ** max (j2 - resU1 - OS, 0))
-                        U2 = fft (modulus (ifft (U2)))
-                        resU2 = resU1 + max (j2 - resU1 - OS, 0)
+                for j2 in range(j1 + 1, J):
+                    for theta2 in range(L):
+                        U2 = subsample_fourier(U1 * psi[j2, theta2][resU1], 2 ** max(j2 - resU1 - OS, 0))
+                        U2 = fft(modulus(ifft(U2)))
+                        resU2 = resU1 + max(j2 - resU1 - OS, 0)
                         
                         if local:
-                            S2 = ifft (subsampleFourier (U2 * phi [resU2], 2 ** (max (J - resU2 - OS, 0)))).real
-                            S.append (S2)
+                            S2 = ifft(subsample_fourier(U2 * phi[resU2], 2 ** (max(J - resU2 - OS, 0)))).real
+                            S.append(S2)
                         else:
-                            S2 = ifft (U2).real
-                            S.append (S2.mean (axis = (-1, -2)))
-                        SIndex.append ([2, j1, theta1, j2, theta2])
+                            S2 = ifft(U2).real
+                            S.append(S2.mean(axis=(-1, -2)))
+                        SIndex.append([2, j1, theta1, j2, theta2])
                         
-        S = np.array (S)
+        S = np.array(S)
         
         # Cropping of the local coefficients at the border of the input images
         if local and crop != 0.0:
-            mask = np.zeros (S.shape, bool)
-            for i in range (self.M // 2 ** (J - OS)):
-                for j in range (self.N // 2 ** (J - OS)):
-                    if i < int (crop * 2 ** OS) or i > self.M // 2 ** (J - OS) - int (crop * 2 ** OS) \
-                       or j < int (crop * 2 ** OS) or j > self.N // 2 ** (J - OS) - int (crop * 2 ** OS):
-                        mask [..., i, j] = True
-            if np.sum (~mask) == 0:
-                raise Exception ("No valid data remains after cropping.")
-            S = ma.MaskedArray (S, mask = mask) # We create a numpy masked array to mask the cropped coefficients.
+            mask = np.zeros(S.shape, bool)
+            for i in range(self.M // 2 ** (J - OS)):
+                for j in range(self.N // 2 ** (J - OS)):
+                    if i < int(crop * 2 ** OS) or i > self.M // 2 ** (J - OS) - int(crop * 2 ** OS) \
+                       or j < int(crop * 2 ** OS) or j > self.N // 2 ** (J - OS) - int(crop * 2 ** OS):
+                        mask[..., i, j] = True
+            if np.sum(~mask) == 0:
+                raise Exception("No valid data remains after cropping.")
+            S = ma.MaskedArray(S, mask=mask) # We create a numpy masked array to mask the cropped coefficients.
                         
-        return WST (J, L, S, index = np.array (SIndex).T, cplx = locCplx)
+        return WST(J, L, S, index=np.array(SIndex).T, cplx=locCplx)
