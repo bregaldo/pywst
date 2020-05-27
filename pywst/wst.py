@@ -305,7 +305,7 @@ class WST:
         """
         filtering = self._filter_args(**args)
         if self.coeffsCov is None:
-            print("Warning! Covariance matrix is None.")
+            #print("Warning! Covariance matrix is None.")
             return np.eye(np.sum(filtering)), self.index[:, filtering]
         else:
             dim = np.sum(filtering)
