@@ -3,7 +3,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.ma as ma
-
+import warnings
 
 class WST:
     """
@@ -224,7 +224,7 @@ class WST:
 
         """
         if self.coeffsCov is not None:
-            print("Warning! The covariance matrix has been computed before the normalization and will not be updated.")
+            warnings.warn("Warning! The covariance matrix has been computed before the normalization and will not be updated.")
         
         if not self.normalized:
             coeffsCopy = self.coeffs.copy()
@@ -305,15 +305,15 @@ class WST:
         """
         filtering = self._filter_args(**args)
         if self.coeffsCov is None:
-            #print("Warning! Covariance matrix is None.")
+            warnings.warn("Warning! Covariance matrix is None.")
             return np.eye(np.sum(filtering)), self.index[:, filtering]
         else:
             dim = np.sum(filtering)
             covM = self.coeffsCov[np.outer(filtering, filtering)].reshape(dim, dim)
             # If demanded, remove off diagonal coefficients when we have too few samples to get a definite sample covariance matrix.
             if self.coeffsCovNbSamples < dim + 1 and autoRemoveOffDiagonalCoeffs: # We typically expect definite sample covariance matrix when coeffsCovNbSamples >= dim + 1.
-                #print("Warning! Removing off diagonal coefficients of the sample covariance matrix (only " + str(self.coeffsCovNbSamples) + " samples for dimension " + str(dim) + ").")
                 covM = np.diag(np.diag(covM))
+                warnings.warn("Warning! Removing off diagonal coefficients of the sample covariance matrix (only " + str(self.coeffsCovNbSamples) + " samples for dimension " + str(dim) + ").")
             return covM, self.index[:, filtering]
         
     def _plot(self, axis, x, y, ylabel, legend="", err=None, j1Ticks=True):
