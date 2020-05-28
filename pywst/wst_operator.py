@@ -1,11 +1,22 @@
 # -*- coding: utf-8 -*-
 # This source file is inspired from the Kymatio project: https://www.kymat.io/index.html
 
+import os
+from functools import partial
 import numpy as np
 import numpy.ma as ma
+import multiprocessing as mp
 from .filters import MorletWavelet, GaussianFilter
 from .utils import fft, ifft, subsample_fourier, modulus
 from .wst import WST
+
+
+# Internal function for the parallel pre-building of the bandpass filters (see WSTOp.load_filters)
+def _build_bp_para(theta_list, bp_filter_cls, M, N, j, L, gamma, sigma0, k0):
+    ret = []
+    for theta in theta_list:
+        ret.append(bp_filter_cls(M, N, j, (L // 2 - theta) * np.pi / L, gamma, sigma0, k0).data)
+    return ret
 
 
 class WSTOp:
@@ -13,7 +24,7 @@ class WSTOp:
     Wavelet Scattering Transform (WST) operator.
     """
     
-    def __init__(self, M, N, J, L=8, OS=0, cplx=False, lf_filter_cls=GaussianFilter, bp_filter_cls=MorletWavelet):
+    def __init__(self, M, N, J, L=8, OS=0, cplx=False, lp_filter_cls=GaussianFilter, bp_filter_cls=MorletWavelet):
         """
         Constructor.
         
@@ -33,6 +44,10 @@ class WSTOp:
             Oversampling parameter. The default is 0.
         cplx : bool, optional
             Set it to true if the WSTOp instance will ever apply to complex data. This would load in memory the whole set of bandpass filters. The default is False.
+        lp_filter_cls : type, optional
+            Class corresponding to the low-pass filter. The default is GaussianFilter.
+        bp_filter_cls : type, optional
+            Class corresponding to the bandpass filter. The default is MorletWavelet.
 
         Returns
         -------
@@ -43,21 +58,26 @@ class WSTOp:
             raise Exception("Choose values for M and N that are proportional to 2^J.")
         
         self.M, self.N, self.J, self.L, self.OS, self.cplx = M, N, J, L, OS, cplx
-        self.load_filters(lf_filter_cls, bp_filter_cls)
+        self.load_filters(lp_filter_cls, bp_filter_cls)
         
-    def load_filters(self, lf_filter_cls, bp_filter_cls):
+    def load_filters(self, lp_filter_cls, bp_filter_cls):
         """
         Build the set of low pass and bandpass filters that are used for the transform.
-        Low pass filters correspond to Gaussian filters.
-        Bandpass filters are Morlet wavelets.
 
+        Parameters
+        ----------
+        lp_filter_cls : type, optional
+            Class corresponding to the low-pass filter.
+        bp_filter_cls : type, optional
+            Class corresponding to the bandpass filter.
+            
         Returns
         -------
         None.
 
         """
         self.psi = {} # Bandpass filters
-        self.phi = {} # Low pass filters
+        self.phi = {} # Low-pass filters
         
         # Filter parameters
         gamma = 4 / self.L  # Aspect ratio
@@ -66,9 +86,19 @@ class WSTOp:
         
         # Build psi filters
         for j in range(self.J):
+            # Parallel pre-build
+            build_bp_para_loc = partial(_build_bp_para, bp_filter_cls=bp_filter_cls, M=self.M, N=self.N, j=j, L=self.L, gamma=gamma, sigma0=sigma0, k0=k0)
+            nb_processes = os.cpu_count()
+            work_list = np.array_split(np.arange(self.L), nb_processes)
+            pool = mp.Pool(processes=nb_processes)
+            results = pool.map(build_bp_para_loc, work_list)
+            bp_filters = []
+            for i in range(len(results)):
+                bp_filters += results[i]
+            
             for theta in range(self.L):
                 self.psi[j, theta] = {}
-                w = bp_filter_cls(self.M, self.N, j, (self.L // 2 - theta) * np.pi / self.L, gamma, sigma0, k0).data
+                w = bp_filters[theta]
                 wF = fft(w).real # The imaginary part is null for Morlet wavelets
                 for res in range(j + 1):
                     self.psi[j, theta][res] = subsample_fourier(wF, 2 ** res, normalize=True)
@@ -80,7 +110,7 @@ class WSTOp:
                         self.psi[j, theta + self.L][res] = fft(np.conjugate(ifft(self.psi[j, theta][res]))).real
         
         # Build phi filters
-        g = lf_filter_cls(self.M, self.N, self.J - 1, sigma0=sigma0).data
+        g = lp_filter_cls(self.M, self.N, self.J - 1, sigma0=sigma0).data
         gF = np.real(fft(g)) # The imaginary part is null for Gaussian filters
         for res in range(self.J):
             self.phi[res] = subsample_fourier(gF, 2 ** res, normalize=True)

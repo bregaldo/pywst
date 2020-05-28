@@ -69,10 +69,10 @@ class GaborFilter (Filter):
         D = np.array([[1, 0], [0, self.gamma ** 2]])
         curv = np.dot(R, np.dot(D, RInv)) / (2 * self.sigma ** 2)
         
-        for ex in [-2, -1, 0, 1, 2]:
-            for ey in [-2, -1, 0, 1, 2]:
+        for ex in [-2, -1, 0, 1]:
+            for ey in [-2, -1, 0, 1]:
                 [xx, yy] = np.mgrid[ex * self.M:self.M + ex * self.M, ey * self.N:self.N + ey * self.N]
-                arg = -(curv[0, 0] * np.multiply(xx, xx) + (curv[0, 1] + curv[1, 0]) * np.multiply(xx, yy) + curv[1, 1] * np.multiply(yy, yy)) + 1.j * (xx * self.k * np.cos(self.theta) + yy * self.k * np.sin(self.theta))
+                arg = -(curv[0, 0] * xx ** 2 + (curv[0, 1] + curv[1, 0]) * xx * yy + curv[1, 1] * yy ** 2) + 1.j * (xx * self.k * np.cos(self.theta) + yy * self.k * np.sin(self.theta))
                 self.data += np.exp(arg)
                 
         normFactor = 2 * np.pi * self.sigma ** 2 / self.gamma
@@ -126,10 +126,10 @@ class GaussianFilter (Filter):
         D = np.array([[1, 0], [0, self.gamma ** 2]])
         curv = np.dot(R, np.dot(D, RInv)) / (2 * self.sigma ** 2)
 
-        for ex in [-2, -1, 0, 1, 2]:
-            for ey in [-2, -1, 0, 1, 2]:
+        for ex in [-2, -1, 0, 1]:
+            for ey in [-2, -1, 0, 1]:
                 [xx, yy] = np.mgrid[ex * self.M:self.M + ex * self.M, ey * self.N:self.N + ey * self.N]
-                arg = -(curv[0, 0] * np.multiply(xx, xx) + (curv[0, 1] + curv[1, 0]) * np.multiply(xx, yy) + curv[1, 1] * np.multiply(yy, yy))
+                arg = -(curv[0, 0] * xx ** 2 + (curv[0, 1] + curv[1, 0]) * xx * yy + curv[1, 1] * yy ** 2)
                 self.data += np.exp(arg)
                 
         normFactor = 2 * np.pi * self.sigma ** 2 / self.gamma
