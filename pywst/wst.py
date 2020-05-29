@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.ma as ma
 import warnings
+from .rwst import RWST
+
 
 class WST:
     """
@@ -385,7 +387,7 @@ class WST:
         if legend != "":
             axis.legend()
         
-    def plot(self, layer=None, j1=None, title="WST"):
+    def plot(self, layer=None, j1=None, title="WST", label=""):
         """
         Plot the WST coefficients.
         Default behaviour plots both layer 1 and layer 2 full set of coefficients.
@@ -398,60 +400,118 @@ class WST:
             Selection of coefficients for a specific j_1 value. The default is None.
         title : str, optional
             Title of the figures. The default is "WST".
+        label : str, optional
+            Label for the legend. The default is "".
 
         Returns
         -------
         None.
 
         """
-        xValues = np.array(range(self.nbM0 + self.nbM1 + self.nbM2))
+        self.plot_compare([], layer=layer, j1=j1, title=title, labels=[label])
+                
+    def plot_compare(self, wst_list, layer=None, j1=None, title="WST", labels=[]):
+        """
+        Plot of the selected set of WST coefficients of the current object next to those from a given list of other WST or RWST objects.
+        
+        Default behaviour plots both layer 1 and layer 2 full set of coefficients.
+        
+        Note that the current object and the objects of wst_list must be of consistent J, L and cplx parameters.
 
-        # Get the shape of the local information (batch + local coefficients per map)
-        locShape = self.coeffs.shape[1:]
-        # Get a mask associated to S0 coefficient if any local coefficient turns out to be masked (we assume uniform mask along coefficient index axis).
-        mask = ma.getmaskarray(self.coeffs[0])
-        # Define an index of local positions that are not masked.
-        validLocIndex = [loc for loc in np.ndindex(locShape) if mask[loc] == False]
-   
-        if layer is None or layer == 1:
-            if j1 is None:
-                xSelection = self._filter_args(layer=1)
+        Parameters
+        ----------
+        wst_list : (R)WST or list of (R)WST
+            WST object or RWST object, or list of multiple WST/RWST objects.
+        layer : int, optional
+            Layer of coefficients to plot (1 or 2). The default is None.
+        j1 : int, optional
+            Selection of coefficients for a specific j_1 value. The default is None.
+        title : str, optional
+            Title of the figures. The default is "WST".
+        labels : list of str, optional
+            List of labels to identify the current object and the input objects.
+            If wst_list is of length N, labels should be of length N+1 at most, where the first element refers to the label of the current object.
+            Default label is "".
+
+        Returns
+        -------
+        None.
+        
+        """
+        # Check input
+        if type(wst_list) != list:
+            wst_list_loc = [wst_list] # Easier to make a list in the following
+        else:
+            wst_list_loc = wst_list.copy() # Local shallow copy
+
+        for elt in wst_list_loc:
+            if type(elt) != WST and type(elt) != RWST:
+                raise Exception("wst_list must be a WST object or a RWST object, or a list of RWST or/and WST objects!")
             else:
-                xSelection = self._filter_args(layer=1, j1=j1)
+                if self.J != elt.J or self.L != elt.L or (type(elt) == WST and self.cplx != elt.cplx):
+                    raise Exception("Inconsistent (R)WST objects.")
+                if type(elt) == WST and (self.log2Vals != elt.log2Vals or self.normalized != elt.normalized):
+                    raise warnings.warn("Warning! Input (R)WST objects have not consistent normalizations compared to the current WST object.")
+            
+        if layer is None:
+            self.plot(layer=1, j1=j1, title=title)
+            self.plot(layer=2, j1=j1, title=title)
+        elif layer == 1 or layer == 2:
+            wst_list_loc = [self] + wst_list_loc # Add current object to wst_list_loc
+            
+            # Check labels
+            if len(labels) < len(wst_list_loc):
+                labels += [""] * (len(wst_list_loc) - len(labels)) # Fill up labels list to be consistent with the length of wst_list
+            
+            # Selection of x values
+            xValues = np.array(range(self.nbM0 + self.nbM1 + self.nbM2))
+            if j1 is None:
+                xSelection = self._filter_args(layer=layer)
+            else:
+                xSelection = self._filter_args(layer=layer, j1=j1)
+            
+            # Figure/axis creation
+            if layer == 1:
+                fig = plt.figure()
+            elif layer == 2:
+                fig = plt.figure(figsize=(30, 5))
+            ax = fig.add_subplot(1, 1, 1)
                 
             # ylabel design
-            ylabel = r"$" + self.log2Vals * r"\log_2(" + self.normalized * r"\widebar{" + "S" + self.normalized * r"}" + r"_1" + self.log2Vals * r")" + r"$"
+            ylabel = r"$" + self.log2Vals * r"\log_2(" + self.normalized * r"\widebar{" + r"S" + self.normalized * r"}" + r"_" + str(layer) + self.log2Vals * r")" + r"$"
             
-            fig = plt.figure()
-            ax = fig.add_subplot(1, 1, 1)
-            for locIndex in validLocIndex:
-                coeffs = self.coeffs[tuple([xSelection]) + locIndex]
-                if self.coeffsCov is None:
-                    coeffsErr = None
-                else:
-                    coeffsErr = np.sqrt(self.coeffsCov.diagonal()[tuple([xSelection]) + locIndex])
-                self._plot(ax, xValues[xSelection], coeffs, ylabel, legend=locIndex, err=coeffsErr)
-            plt.subplots_adjust(bottom=0.2)
-            plt.title(title + " - m = 1")
-            plt.show()
-        if layer is None or layer == 2:
-            if j1 is None:
-                xSelection = self._filter_args(layer=2)
-            else:
-                xSelection = self._filter_args(layer=2, j1=j1)
-            # ylabel design
-            ylabel = r"$" + self.log2Vals * r"\log_2(" + self.normalized * r"\widebar{" + r"S" + self.normalized * r"}" + r"_2" + self.log2Vals * r")" + r"$"
+            # Plot
+            for wst_index, wst_curr in enumerate(wst_list_loc):
+                
+                if type(wst_curr) == RWST:
+                    wst_curr = wst_curr.to_wst(cplx=self.cplx) # If RWST object, convert it first to a WST object.
+                
+                # Get the shape of the local information (batch + local coefficients per map)
+                locShape = wst_curr.coeffs.shape[1:]
+                # Get a mask associated to S0 coefficient if any local coefficient turns out to be masked (we assume uniform mask along coefficient index axis).
+                mask = ma.getmaskarray(wst_curr.coeffs[0])
+                # Define an index of local positions that are not masked.
+                validLocIndex = [loc for loc in np.ndindex(locShape) if mask[loc] == False]
+                
+                for locIndex in validLocIndex:
+                    # Label design
+                    label = labels[wst_index]
+                    if label != "" and locIndex != ():
+                        label += " - "
+                    if locIndex != ():
+                        label += str(locIndex)
+                    
+                    coeffs = wst_curr.coeffs[tuple([xSelection]) + locIndex]
+                    if wst_curr.coeffsCov is None:
+                        coeffsErr = None
+                    else:
+                        coeffsErr = np.sqrt(wst_curr.coeffsCov.diagonal()[tuple([xSelection]) + locIndex])
+                            
+                    self._plot(ax, xValues[xSelection], coeffs, ylabel, legend=label, err=coeffsErr)
             
-            fig = plt.figure(figsize=(30, 5))
-            ax = fig.add_subplot(1, 1, 1)
-            for locIndex in validLocIndex:
-                coeffs = self.coeffs[tuple([xSelection]) + locIndex]
-                if self.coeffsCov is None:
-                    coeffsErr = None
-                else:
-                    coeffsErr = np.sqrt(self.coeffsCov.diagonal()[tuple([xSelection]) + locIndex])
-                self._plot(ax, xValues[xSelection], coeffs, ylabel, legend=locIndex, err=coeffsErr)
+            # Finalization
             plt.subplots_adjust(bottom=0.2)
-            plt.title(title + " - m = 2")
-            plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+            plt.title(title + " - m = " + str(layer))
+            if layer == 2:
+                plt.tight_layout(rect=[0, 0.03, 1, 0.95])
             plt.show()

@@ -4,6 +4,7 @@ import numpy as np
 import scipy.optimize as opt
 import numpy.linalg as la
 import numpy.ma as ma
+import warnings
 
 from .wst import WST
 from .wst_operator import WSTOp
@@ -16,7 +17,7 @@ class RWSTOp:
     Reduced Wavelet Scattering Transform (RWST) operator.
     """
     
-    def __init__(self, M, N, J, L=8, OS=0, cplx=False, model=RWSTModel1):
+    def __init__(self, M, N, J, L=8, OS=0, cplx=False, model=RWSTModel1, wst_op=None):
         """
         Constructor.
         
@@ -36,13 +37,22 @@ class RWSTOp:
             Set it to true if the RWSTOp instance will ever apply to complex data. This would load in memory the whole set of bandpass filters. The default is False.
         model : type, optional
             Class of the RWST model of the angular dependencies. The default is RWSTModel1.
+        wst_op : WSTOp, optional
+            WSTOp object with consistent parameters that avoids multiple filters loading.
 
         Returns
         -------
         None.
         """
         self.M, self.N, self.J, self.L, self.OS, self.cplx = M, N, J, L, OS, cplx
-        self.wstOp = WSTOp(M, N, J, L, OS, cplx)
+        if wst_op is None:
+            self.wstOp = WSTOp(M, N, J, L, OS, cplx)
+        else:
+            if wst_op.M == M and wst_op.N == N and wst_op.J == J and wst_op.L == L and wst_op.OS == OS and wst_op.cplx == cplx:
+                self.wstOp = wst_op
+            else:
+                warnings.warn("Warning! Loading WSTOp new instance because of wst_op inconsistencies.")
+                self.wstOp = WSTOp(M, N, J, L, OS, cplx)
         self.model = model
     
     def apply(self, data, local=False):
@@ -75,6 +85,8 @@ class RWSTOp:
             wst = data
             if wst.J != self.J:
                 raise Exception("Inconsistent J values between RWST operator and input WST coefficients.")
+            if not wst.log2Vals:
+                warnings.warn("Input WST coefficients should have logarithmic values.")
         else:
             wst = self.wstOp.apply(data, local)
             wst.normalize(log2=True)
@@ -90,6 +102,10 @@ class RWSTOp:
         
         model = self.model(self.L)
         rwst = RWST(self.J, self.L, model, locShape=locShape)
+        
+        # We keep relevant information on the WST object
+        rwst.wst_log2Vals = wst.log2Vals
+        rwst.wst_normalized = wst.normalized
         
         # Layer 0 coefficient
         coeffs, coeffsIndex = wst.get_coeffs(layer=0)

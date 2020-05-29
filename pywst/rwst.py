@@ -3,6 +3,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.ma as ma
+import pywst as pw
 
 
 class RWST:
@@ -37,6 +38,10 @@ class RWST:
         
         self.coeffs = {}
         self.coeffsCov = {}
+        
+        # Information on the original WST coefficients
+        self.wst_log2Vals = False
+        self.wst_normalized = False
         
         # Initialization for each of the three layer of coefficients
         self.coeffs['m0'] = np.zeros((1,) + locShape)
@@ -260,7 +265,7 @@ class RWST:
             ret.append(s)
         return ret
             
-    def plot(self, names=[]):
+    def plot(self, names=[], label=""):
         """
         Plot of the selected set of RWST coefficients.
         
@@ -272,17 +277,65 @@ class RWST:
             List of coefficients we want to plot on the same figure.
             Can be "chi2r1" or "chi2r2" for reduced chi square values, or names included in model.nbParamsLayer1 and model.nbParamsLayer2 variables.
             The default is [].
+        label : str, optional
+            Label for the legend. The default is "".
 
         Returns
         -------
         None.
 
         """
-        if names == []:
-            self.plot(names=self.model.layer1Names)
-            self.plot(names=self.model.layer2Names)
-            self.plot(names=["chi2r1", "chi2r2"])
+        self.plot_compare([], names=names, labels=[label])
+            
+    def plot_compare(self, rwst_list, names=[], labels=[]):
+        """
+        Plot of the selected set of RWST coefficients of the current object next to those from a given list of other RWST objects.
+        
+        Default behaviour plots layer 1 and layer 2 coefficients, and the reduced chi square values.
+        
+        Note that the current object and the objects of rwst_list must be of consistent J, L, RWST model.
+
+        Parameters
+        ----------
+        rwst_list : RWST or list of RWST
+            RWST object or list of multiple RWST objects.
+        names : list of str, optional
+            List of coefficients we want to plot on the same figure.
+            Can be "chi2r1" or "chi2r2" for reduced chi square values, or names included in model.nbParamsLayer1 and model.nbParamsLayer2 variables.
+            The default is [].
+        labels : list of str, optional
+            List of labels to identify the current object and the input objects.
+            If rwst_list is of length N, labels should be of length N+1 at most, where the first element refers to the label of the current object.
+            Default label is "".
+
+        Returns
+        -------
+        None.
+        
+        """
+        # Check input
+        if type(rwst_list) != list:
+            rwst_list_loc = [rwst_list] # Easier to make a list in the following
         else:
+            rwst_list_loc = rwst_list.copy() # Local shallow copy
+        for elt in rwst_list_loc:
+            if type(elt) != RWST:
+                raise Exception("rwst_list must be a RWST object or a list of RWST objects!")
+            else:
+                if self.J != elt.J or self.L != elt.L or type(self.model) != type(elt.model):
+                    raise Exception("Inconsistent RWST objects.")
+            
+        if names == []:
+            self.plot_compare(rwst_list, names=self.model.layer1Names, labels=labels)
+            self.plot_compare(rwst_list, names=self.model.layer2Names, labels=labels)
+            self.plot_compare(rwst_list, names=["chi2r1", "chi2r2"], labels=labels)
+        else:
+            rwst_list_loc = [self] + rwst_list_loc # Add current object to rwst_list_loc
+            
+            # Check labels
+            if len(labels) < len(rwst_list_loc):
+                labels += [""] * (len(rwst_list_loc) - len(labels)) # Fill up labels list to be consistent with the length of rwst_list
+            
             indexLayer1 = []
             indexLayer2 = []
             for name in names:
@@ -296,21 +349,17 @@ class RWST:
                 for index, nameList in enumerate(self.model.layer2Names):
                     if name == nameList:
                         indexLayer2.append(index)
-                    
-            locShape = self.coeffs['m0'].shape[1:]
-            # Get a mask associated to S0 coefficient if any local coefficient turns out to be masked (we assume uniform mask along coefficient index axis).
-            mask = ma.getmaskarray(self.coeffs['m0'][0])
-            # Define an index of local positions that are not masked.
-            validLocIndex = [loc for loc in np.ndindex(locShape) if mask[loc] == False]
-            
-            colorCycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
-                    
+                        
             nRows = int(np.sqrt(len(indexLayer1) + len(indexLayer2)))
             nCols = int(np.ceil((len(indexLayer1) + len(indexLayer2)) / nRows))
             
             fig, axs = plt.subplots(nRows, nCols, figsize=(nCols * 4, nRows * 3))
-            j1Vals = np.arange(self.J)
-            for index, pos in enumerate(np.ndindex((nRows, nCols))):
+            
+            colorCycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
+            
+            for ax_index, pos in enumerate(np.ndindex((nRows, nCols))):
+                legend = False # No legend except if there is a label to show in the following
+                
                 # Correction for weird behavior of subplots
                 if nCols == 1 and nRows > 1:
                     pos = pos[0]
@@ -319,52 +368,158 @@ class RWST:
                 elif nRows == 1 and nCols == 1:
                     axs = [axs]
                     pos = pos[0]
+                
+                color_cnt = 0 # Count for the color cycle
+                
+                for rwst_index, rwst_curr in enumerate(rwst_list_loc): # For every RWST object in rwst_list
+                
+                    # Get local parameters
+                    locShape = rwst_curr.coeffs['m0'].shape[1:]
+                    # Get a mask associated to S0 coefficient if any local coefficient turns out to be masked (we assume uniform mask along coefficient index axis).
+                    mask = ma.getmaskarray(rwst_curr.coeffs['m0'][0])
+                    # Define an index of local positions that are not masked.
+                    validLocIndex = [loc for loc in np.ndindex(locShape) if mask[loc] == False]
                     
-                if index < len(indexLayer1):
-                    index = indexLayer1[index]
-                    for locIndex in validLocIndex:
-                        coeffs = self.coeffs['m1'][np.index_exp[:, index] + locIndex]
-                        if index != self.model.nbParamsLayer1: # No std for chi2r1
-                            coeffsStd = np.sqrt(self.coeffsCov['m1'][np.index_exp[:, index, index] + locIndex])
-                        else:
-                            coeffsStd = np.zeros(coeffs.shape)
-                        axs[pos].plot(j1Vals, coeffs, label=str(locIndex))
-                        axs[pos].fill_between(j1Vals, coeffs - coeffsStd, coeffs + coeffsStd, alpha=0.2)
-                    axs[pos].legend()
-                    axs[pos].set_xlabel("$j_1$")
-                    if index != self.model.nbParamsLayer1:
-                        axs[pos].set_ylabel(self.model.layer1PlotParams[index][0])
-                        if self.model.layer1PlotParams[index][1]: # Readable radian ylabels?
-                            angleRange = np.arange((self.coeffs['m1'][:, index].ravel().min() // (self.L / 4)) * self.L // 4, (self.coeffs['m1'][:, index].ravel().max() // (self.L / 4) + 2) * self.L // 4, self.L // 4)
-                            axs[pos].set_yticks(angleRange)
-                            axs[pos].set_yticklabels(self._theta_labels(angleRange))
-                    else:
-                        axs[pos].set_ylabel(r"$\chi^{2, \mathrm{S_1}}_\mathrm{r}(j_1)$")
-                elif index < len(indexLayer1) + len(indexLayer2):
-                    index = indexLayer2[index - len(indexLayer1)]
-                    for locNum, locIndex in enumerate(validLocIndex):
-                        color = colorCycle[locNum % len(colorCycle)]
-                        coeffs = self.coeffs['m2'][np.index_exp[:, :, index] + locIndex]
-                        if index != self.model.nbParamsLayer2: # No std for chi2r2
-                            coeffsStd = np.sqrt(self.coeffsCov['m2'][np.index_exp[:, :, index, index] + locIndex])
-                        else:
-                            coeffsStd = np.zeros(coeffs.shape)
-                        for j1 in np.arange(self.J - 1):
-                            j2Vals = np.arange(j1 + 1, self.J)
-                            if j1 != self.J - 2:
-                                axs[pos].plot(j2Vals, coeffs[j1, j1 + 1:], label=(j1 == 0) * str(locIndex), color=color)
-                                axs[pos].fill_between(j2Vals, coeffs[j1, j1 + 1:] - coeffsStd[j1, j1 + 1:], coeffs[j1, j1 + 1:] + coeffsStd[j1, j1 + 1:], alpha=0.2, color=color)
+                    j1Vals = np.arange(rwst_curr.J)
+                    
+                    if ax_index < len(indexLayer1): # Plot instructions for first order coefficients
+                        index = indexLayer1[ax_index]
+                        for locIndex in validLocIndex:
+                            color = colorCycle[color_cnt % len(colorCycle)]
+                            
+                            coeffs = rwst_curr.coeffs['m1'][np.index_exp[:, index] + locIndex]
+                            if index != rwst_curr.model.nbParamsLayer1: # No std for chi2r1
+                                coeffsStd = np.sqrt(rwst_curr.coeffsCov['m1'][np.index_exp[:, index, index] + locIndex])
                             else:
-                                axs[pos].errorbar(j2Vals, coeffs[j1, j1 + 1:], fmt='.', yerr=coeffsStd[j1, j1 + 1:], color=color)
+                                coeffsStd = np.zeros(coeffs.shape)
+                                
+                            # Label design
+                            label = labels[rwst_index]
+                            if label != "" and locIndex != ():
+                                label += " - "
+                            if locIndex != ():
+                                label += str(locIndex)
+                            if label != "": legend = True # Need to display a legend
+                                
+                            axs[pos].plot(j1Vals, coeffs, label=label, color=color)
+                            axs[pos].fill_between(j1Vals, coeffs - coeffsStd, coeffs + coeffsStd, alpha=0.2, color=color)
+                            
+                            color_cnt += 1
+
+                        axs[pos].set_xlabel("$j_1$")
+                        if index != rwst_curr.model.nbParamsLayer1:
+                            axs[pos].set_ylabel(rwst_curr.model.layer1PlotParams[index][0])
+                            if rwst_curr.model.layer1PlotParams[index][1]: # Readable radian ylabels?
+                                angleRange = np.arange((rwst_curr.coeffs['m1'][:, index].ravel().min() // (rwst_curr.L / 4)) * rwst_curr.L // 4, (rwst_curr.coeffs['m1'][:, index].ravel().max() // (rwst_curr.L / 4) + 2) * rwst_curr.L // 4, rwst_curr.L // 4)
+                                axs[pos].set_yticks(angleRange)
+                                axs[pos].set_yticklabels(rwst_curr._theta_labels(angleRange))
+                        else:
+                            axs[pos].set_ylabel(r"$\chi^{2, \mathrm{S_1}}_\mathrm{r}(j_1)$")
+                            
+                    elif ax_index < len(indexLayer1) + len(indexLayer2): # Plot instructions for second order coefficients
+                        index = indexLayer2[ax_index - len(indexLayer1)]
+                        for locIndex in validLocIndex:
+                            color = colorCycle[color_cnt % len(colorCycle)]
+                            
+                            coeffs = rwst_curr.coeffs['m2'][np.index_exp[:, :, index] + locIndex]
+                            if index != rwst_curr.model.nbParamsLayer2: # No std for chi2r2
+                                coeffsStd = np.sqrt(rwst_curr.coeffsCov['m2'][np.index_exp[:, :, index, index] + locIndex])
+                            else:
+                                coeffsStd = np.zeros(coeffs.shape)
+                            for j1 in np.arange(rwst_curr.J - 1):
+                                j2Vals = np.arange(j1 + 1, rwst_curr.J)
+                                if j1 != rwst_curr.J - 2:
+                                    
+                                    # Label design
+                                    label = ""
+                                    if j1 == 0:
+                                        label = labels[rwst_index]
+                                        if label != "" and locIndex != ():
+                                            label += " - "
+                                        if locIndex != ():
+                                            label += str(locIndex)
+                                    if label != "": legend = True # Need to display a legend
+                                        
+                                    axs[pos].plot(j2Vals, coeffs[j1, j1 + 1:], label=label, color=color)
+                                    axs[pos].fill_between(j2Vals, coeffs[j1, j1 + 1:] - coeffsStd[j1, j1 + 1:], coeffs[j1, j1 + 1:] + coeffsStd[j1, j1 + 1:], alpha=0.2, color=color)
+                                else:
+                                    axs[pos].errorbar(j2Vals, coeffs[j1, j1 + 1:], fmt='.', yerr=coeffsStd[j1, j1 + 1:], color=color)
+                                    
+                            color_cnt += 1
+                        
+                        axs[pos].set_xlabel("$j_2$")
+                        if index != rwst_curr.model.nbParamsLayer2:
+                            axs[pos].set_ylabel(rwst_curr.model.layer2PlotParams[index][0])
+                            if rwst_curr.model.layer2PlotParams[index][1]: # Readable radian ylabels?
+                                angleRange = np.arange((rwst_curr.coeffs['m2'][:, :, index].ravel().min() // (rwst_curr.L / 4)) * rwst_curr.L // 4, (rwst_curr.coeffs['m2'][:, :, index].ravel().max() // (rwst_curr.L / 4) + 2) * rwst_curr.L // 4, rwst_curr.L // 4)
+                                axs[pos].set_yticks(angleRange)
+                                axs[pos].set_yticklabels(rwst_curr._theta_labels(angleRange))
+                        else:
+                            axs[pos].set_ylabel(r"$\chi^{2, \mathrm{S_2}}_\mathrm{r}(j_1,j_2)$")
+                        
+                if legend:
                     axs[pos].legend()
-                    axs[pos].set_xlabel("$j_2$")
-                    if index != self.model.nbParamsLayer2:
-                        axs[pos].set_ylabel(self.model.layer2PlotParams[index][0])
-                        if self.model.layer2PlotParams[index][1]: # Readable radian ylabels?
-                            angleRange = np.arange((self.coeffs['m2'][:, :, index].ravel().min() // (self.L / 4)) * self.L // 4, (self.coeffs['m2'][:, :, index].ravel().max() // (self.L / 4) + 2) * self.L // 4, self.L // 4)
-                            axs[pos].set_yticks(angleRange)
-                            axs[pos].set_yticklabels(self._theta_labels(angleRange))
-                    else:
-                        axs[pos].set_ylabel(r"$\chi^{2, \mathrm{S_2}}_\mathrm{r}(j_1,j_2)$")
+                        
             plt.tight_layout()
             plt.show()
+            
+    def to_wst(self, cplx=False):
+        """
+        Return the corresponding WST object of the current object.
+
+        Returns
+        -------
+        None.
+
+        """
+        # Build a WST index
+        wst_index = [[0, 0, 0, 0, 0]] # Layer 0
+        for j1 in range(self.J): # Layer 1
+            for theta1 in range(self.L * (1 + cplx)):
+                wst_index.append([1, j1, theta1, 0, 0])
+        for j1 in range(self.J): # Layer 2
+            for theta1 in range(self.L * (1 + cplx)):
+                for j2 in range(j1 + 1, self.J):
+                    for theta2 in range(self.L):
+                        wst_index.append([2, j1, theta1, j2, theta2])
+        wst_index = np.array(wst_index).T
+        
+        # Get local shape and mask
+        loc_shape = self.coeffs['m0'][0].shape
+        mask = ma.getmaskarray(self.coeffs['m0'][0])
+        valid_loc_index = [loc for loc in np.ndindex(loc_shape) if mask[loc] == False]
+        
+        # Initialization
+        S = np.zeros((wst_index.shape[1],) + loc_shape)
+        if mask.sum() != 0: # We have at least one masked value
+            S = ma.MaskedArray(S)
+            S[:, mask] = ma.masked
+        
+        # S0 coefficients
+        S[0] = self.coeffs['m0'][0]
+        
+        # S1 coefficients
+        for j1 in range(self.J):
+            filtering = np.logical_and(wst_index[0] == 1, wst_index[1] == j1)
+            theta_vals = wst_index[2, filtering]
+            coeffs = self.coeffs['m1'][j1, :-1]
+            for loc_index in np.ndindex(loc_shape):
+                S[(filtering,) + loc_index] = self.model.layer1(theta_vals, *(coeffs[np.index_exp[:] + loc_index]))
+            
+        # S2 coefficients
+        for j1 in range(self.J):
+            for j2 in range(j1 + 1, self.J):
+                filtering = np.logical_and(wst_index[1] == j1, wst_index[3] == j2)
+                theta_vals = (wst_index[2, filtering], wst_index[4, filtering])
+                coeffs = self.coeffs['m2'][j1, j2, :-1]
+                for loc_index in valid_loc_index:
+                    S[(filtering,) + loc_index] = self.model.layer2(theta_vals, *(coeffs[np.index_exp[:] + loc_index]))
+                
+        # We create the WST object and fill out its attributes
+        wst = pw.WST(self.J, self.L, S, index=wst_index, cplx=cplx)
+        wst.normalized = self.wst_normalized
+        wst.log2Vals = self.wst_log2Vals
+        
+        # TODO: add uncertainties to wst
+        
+        return wst
