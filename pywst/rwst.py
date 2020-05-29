@@ -273,7 +273,7 @@ class RWST:
 
         Parameters
         ----------
-        names : list of str, optional
+        names : str or list of str, optional
             List of coefficients we want to plot on the same figure.
             Can be "chi2r1" or "chi2r2" for reduced chi square values, or names included in model.layer1_nbparams and model.layer2_nbparams variables.
             The default is [].
@@ -299,7 +299,7 @@ class RWST:
         ----------
         rwst_list : RWST or list of RWST
             RWST object or list of multiple RWST objects.
-        names : list of str, optional
+        names : str or list of str, optional
             List of coefficients we want to plot on the same figure.
             Can be "chi2r1" or "chi2r2" for reduced chi square values, or names included in model.layer1_nbparams and model.layer2_nbparams variables.
             The default is [].
@@ -336,6 +336,10 @@ class RWST:
             if len(labels) < len(rwst_list_loc):
                 labels += [""] * (len(rwst_list_loc) - len(labels)) # Fill up labels list to be consistent with the length of rwst_list
             
+            # We first make sure to have a list of names for the following
+            if type(names) != list:
+                names = [names]
+                
             indexLayer1 = []
             indexLayer2 = []
             for name in names:
