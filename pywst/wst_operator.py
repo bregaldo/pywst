@@ -2,7 +2,9 @@
 # This source file is inspired from the Kymatio project: https://www.kymat.io/index.html
 
 import os
+import sys
 from functools import partial
+import warnings
 import numpy as np
 import numpy.ma as ma
 import multiprocessing as mp
@@ -153,6 +155,13 @@ class WSTOp:
         # Check if we are dealing with a batch of images or not.
         if not (data.ndim == 2 or data.ndim == 3):
             raise Exception("Bad input shape.")
+            
+        # Check endianness for little-endian systems.
+        # If input data is big-endian, we swap the byte order.
+        # Should be useless with scipy 1.5.0.
+        if sys.byteorder == 'little' and data.dtype.byteorder == '>':
+            warnings.warn("Warning! Swapping byte order of input data to avoid FFT error.")
+            data = data.byteswap().newbyteorder()
         
         if np.isrealobj(data):  # We make sure that data do not contain any complex value
             locCplx = False # We do not need the whole set of WST coefficients for real data
