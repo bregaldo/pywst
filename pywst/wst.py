@@ -47,12 +47,12 @@ class WST:
         self.cplx = cplx
         
         # Number of coefficients
-        self.nbM0 = 1
-        self.nbM1 = J * L * (1 + cplx)
-        self.nbM2 = J * (J - 1) * L * L * (1 + cplx) // 2
+        self.nb_m0 = 1
+        self.nb_m1 = J * L * (1 + cplx)
+        self.nb_m2 = J * (J - 1) * L * L * (1 + cplx) // 2
         
         self.coeffs = coeffs
-        self.coeffsCov = None
+        self.coeffs_cov = None
         
         # Check if we are dealing with a batch of images coefficients or not, and if we have local coefficients or not.
         if coeffs.ndim == 1:
@@ -73,7 +73,7 @@ class WST:
         # Reordering and definition of the current index
         if index is not None:
             self.reorder(index)
-        self.index = np.zeros((5, self.nbM0 + self.nbM1 + self.nbM2))
+        self.index = np.zeros((5, self.nb_m0 + self.nb_m1 + self.nb_m2))
         cnt = 1
         for j1 in range(J):
             for theta1 in range(L * (1 + cplx)):
@@ -88,7 +88,7 @@ class WST:
                         
         # Normalization initialization
         self.normalized = False
-        self.log2Vals = False
+        self.log2vals = False
         
         # Plot design parameters
         self._xticks, self._xticksMinor, self._xticklabels, self._xticklabelsMinor, self._tickAlignment = [], [], [], [], []
@@ -225,7 +225,7 @@ class WST:
         None.
 
         """
-        if self.coeffsCov is not None:
+        if self.coeffs_cov is not None:
             warnings.warn("Warning! The covariance matrix has been computed before the normalization and will not be updated.")
         
         if not self.normalized:
@@ -241,10 +241,10 @@ class WST:
                     cnt += self.L * (self.J - j1 - 1)
             self.normalized = True
         
-        if not self.log2Vals:
+        if not self.log2vals:
             if log2:
                 self.coeffs = np.log2(self.coeffs)
-                self.log2Vals = True
+                self.log2vals = True
                 
     def average(self):
         """
@@ -268,16 +268,16 @@ class WST:
             else:
                 samples = coeffsCopy.shape[-1]
                 
-            coeffsCov = ma.cov(coeffsCopy) / samples # Masked array covariance function to properly handle masked coefficients.
+            coeffs_cov = ma.cov(coeffsCopy) / samples # Masked array covariance function to properly handle masked coefficients.
             
             self.coeffs = coeffsCopy.mean(axis=-1)
-            self.coeffsCov = coeffsCov
-            self.coeffsCovNbSamples = samples # Keep in memory the number of samples used to compute the sample covariance matrix.
+            self.coeffs_cov = coeffs_cov
+            self.coeffs_cov_nbsamples = samples # Keep in memory the number of samples used to compute the sample covariance matrix.
             
             self.batch = False
             self.local = False
         
-    def get_coeffs_cov(self, autoRemoveOffDiagonalCoeffs=True, **args):
+    def get_coeffs_cov(self, autoremove_offdiag=True, **args):
         """
         Return the covariance matrix corresponding to the selected coefficients.
 
@@ -293,7 +293,7 @@ class WST:
             Selection of a specific j_2 values. The default is all j_2 values.
         theta2 : int, optional
             Selection of a specific theta_2 values. The default is all theta_2 values.
-        autoRemoveOffDiagonalCoeffs : bool, optional
+        autoremove_offdiag : bool, optional
             If we need to guarantee the covariance matrix to be definite, we may need to remove off diagonal coefficients.
             This is done when the effective number of samples to compute the sample covariance matrix is strictly lower than the dimension of the matrix plus one.
             The default is True.
@@ -306,19 +306,19 @@ class WST:
             Index of the selected coefficients.
         """
         filtering = self._filter_args(**args)
-        if self.coeffsCov is None:
+        if self.coeffs_cov is None:
             warnings.warn("Warning! Covariance matrix is None.")
             return np.eye(np.sum(filtering)), self.index[:, filtering]
         else:
             dim = np.sum(filtering)
-            covM = self.coeffsCov[np.outer(filtering, filtering)].reshape(dim, dim)
+            covM = self.coeffs_cov[np.outer(filtering, filtering)].reshape(dim, dim)
             # If demanded, remove off diagonal coefficients when we have too few samples to get a definite sample covariance matrix.
-            if self.coeffsCovNbSamples < dim + 1 and autoRemoveOffDiagonalCoeffs: # We typically expect definite sample covariance matrix when coeffsCovNbSamples >= dim + 1.
+            if self.coeffs_cov_nbsamples < dim + 1 and autoremove_offdiag: # We typically expect definite sample covariance matrix when coeffs_cov_nbsamples >= dim + 1.
                 covM = np.diag(np.diag(covM))
-                warnings.warn("Warning! Removing off diagonal coefficients of the sample covariance matrix (only " + str(self.coeffsCovNbSamples) + " samples for dimension " + str(dim) + ").")
+                warnings.warn("Warning! Removing off diagonal coefficients of the sample covariance matrix (only " + str(self.coeffs_cov_nbsamples) + " samples for dimension " + str(dim) + ").")
             return covM, self.index[:, filtering]
         
-    def _plot(self, axis, x, y, ylabel, legend="", err=None, j1Ticks=True):
+    def _plot(self, axis, x, y, ylabel, legend="", err=None, j1ticks=True):
         """
         Internal plot function.
 
@@ -336,7 +336,7 @@ class WST:
             Label for the legend. The default is "".
         err : array, optional
             Error on the coefficients. The default is None.
-        j1Ticks : TYPE, optional
+        j1ticks : bool, optional
             Do we want to show ticks for every j_1 value? The default is True.
 
         Returns
@@ -351,7 +351,7 @@ class WST:
         
         # Ticks and grid parameters
         axis.set_ylabel(ylabel)
-        if j1Ticks:
+        if j1ticks:
             axis.set_xticks(self._xticks)
             axis.set_xticklabels(self._xticklabels)
         else:
@@ -450,7 +450,7 @@ class WST:
             else:
                 if self.J != elt.J or self.L != elt.L or (type(elt) == WST and self.cplx != elt.cplx):
                     raise Exception("Inconsistent (R)WST objects.")
-                if type(elt) == WST and (self.log2Vals != elt.log2Vals or self.normalized != elt.normalized):
+                if type(elt) == WST and (self.log2vals != elt.log2vals or self.normalized != elt.normalized):
                     raise warnings.warn("Warning! Input (R)WST objects have not consistent normalizations compared to the current WST object.")
             
         if layer is None:
@@ -464,7 +464,7 @@ class WST:
                 labels += [""] * (len(wst_list_loc) - len(labels)) # Fill up labels list to be consistent with the length of wst_list
             
             # Selection of x values
-            xValues = np.array(range(self.nbM0 + self.nbM1 + self.nbM2))
+            xValues = np.array(range(self.nb_m0 + self.nb_m1 + self.nb_m2))
             if j1 is None:
                 xSelection = self._filter_args(layer=layer)
             else:
@@ -478,7 +478,7 @@ class WST:
             ax = fig.add_subplot(1, 1, 1)
                 
             # ylabel design
-            ylabel = r"$" + self.log2Vals * r"\log_2(" + self.normalized * r"\widebar{" + r"S" + self.normalized * r"}" + r"_" + str(layer) + self.log2Vals * r")" + r"$"
+            ylabel = r"$" + self.log2vals * r"\log_2(" + self.normalized * r"\widebar{" + r"S" + self.normalized * r"}" + r"_" + str(layer) + self.log2vals * r")" + r"$"
             
             # Plot
             for wst_index, wst_curr in enumerate(wst_list_loc):
@@ -487,11 +487,11 @@ class WST:
                     wst_curr = wst_curr.to_wst(cplx=self.cplx) # If RWST object, convert it first to a WST object.
                 
                 # Get the shape of the local information (batch + local coefficients per map)
-                locShape = wst_curr.coeffs.shape[1:]
+                loc_shape = wst_curr.coeffs.shape[1:]
                 # Get a mask associated to S0 coefficient if any local coefficient turns out to be masked (we assume uniform mask along coefficient index axis).
                 mask = ma.getmaskarray(wst_curr.coeffs[0])
                 # Define an index of local positions that are not masked.
-                validLocIndex = [loc for loc in np.ndindex(locShape) if mask[loc] == False]
+                validLocIndex = [loc for loc in np.ndindex(loc_shape) if mask[loc] == False]
                 
                 for locIndex in validLocIndex:
                     # Label design
@@ -502,10 +502,10 @@ class WST:
                         label += str(locIndex)
                     
                     coeffs = wst_curr.coeffs[tuple([xSelection]) + locIndex]
-                    if wst_curr.coeffsCov is None:
+                    if wst_curr.coeffs_cov is None:
                         coeffsErr = None
                     else:
-                        coeffsErr = np.sqrt(wst_curr.coeffsCov.diagonal()[tuple([xSelection]) + locIndex])
+                        coeffsErr = np.sqrt(wst_curr.coeffs_cov.diagonal()[tuple([xSelection]) + locIndex])
                             
                     self._plot(ax, xValues[xSelection], coeffs, ylabel, legend=label, err=coeffsErr)
             

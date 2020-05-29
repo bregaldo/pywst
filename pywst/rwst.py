@@ -12,7 +12,7 @@ class RWST:
     This contains the corresponding coefficients and helps to handle and to plot these coefficients.
     """
     
-    def __init__(self, J, L, model, locShape=()):
+    def __init__(self, J, L, model, loc_shape=()):
         """
         Constructor.
 
@@ -24,7 +24,7 @@ class RWST:
             Number of angles between 0 and pi.
         model : RWSTModelBase
             Chosen RWST model object.
-        locShape : tuple of ints, optional
+        loc_shape : tuple of ints, optional
             Shape of the local dimensions (batch dimension + local dimensions)
 
         Returns
@@ -37,19 +37,19 @@ class RWST:
         self.model = model
         
         self.coeffs = {}
-        self.coeffsCov = {}
+        self.coeffs_cov = {}
         
         # Information on the original WST coefficients
-        self.wst_log2Vals = False
+        self.wst_log2vals = False
         self.wst_normalized = False
         
         # Initialization for each of the three layer of coefficients
-        self.coeffs['m0'] = np.zeros((1,) + locShape)
-        self.coeffs['m1'] = np.zeros((J, model.nbParamsLayer1 + 1) + locShape)       # +1 to add chi2r coefficients
-        self.coeffs['m2'] = np.zeros((J, J, model.nbParamsLayer2 + 1) + locShape)    # +1 to add chi2r coefficients
-        self.coeffsCov['m0'] = np.zeros((1, 1) + locShape) # Actually, it is not possible yet to get local information for this m0 covariance matrix.
-        self.coeffsCov['m1'] = np.zeros((J, model.nbParamsLayer1, model.nbParamsLayer1) + locShape)
-        self.coeffsCov['m2'] = np.zeros((J, J, model.nbParamsLayer2, model.nbParamsLayer2) + locShape)
+        self.coeffs['m0'] = np.zeros((1,) + loc_shape)
+        self.coeffs['m1'] = np.zeros((J, model.layer1_nbparams + 1) + loc_shape)       # +1 to add chi2r coefficients
+        self.coeffs['m2'] = np.zeros((J, J, model.layer2_nbparams + 1) + loc_shape)    # +1 to add chi2r coefficients
+        self.coeffs_cov['m0'] = np.zeros((1, 1) + loc_shape) # Actually, it is not possible yet to get local information for this m0 covariance matrix.
+        self.coeffs_cov['m1'] = np.zeros((J, model.layer1_nbparams, model.layer1_nbparams) + loc_shape)
+        self.coeffs_cov['m2'] = np.zeros((J, J, model.layer2_nbparams, model.layer2_nbparams) + loc_shape)
         
     def _set_mask(self, mask):
         """
@@ -71,15 +71,15 @@ class RWST:
         self.coeffs['m1'][:, :, mask] = ma.masked
         self.coeffs['m2'] = ma.MaskedArray(self.coeffs['m2'])
         self.coeffs['m2'][:, :, :, mask] = ma.masked
-        self.coeffsCov['m0'] = ma.MaskedArray(self.coeffsCov['m0'])
-        if self.coeffsCov['m0'][0, 0].shape == mask.shape: # Special case for m0 rwst coefficient as it is not possible for now to get local information.
-            self.coeffsCov['m0'][:, :, mask] = ma.masked
-        self.coeffsCov['m1'] = ma.MaskedArray(self.coeffsCov['m1'])
-        self.coeffsCov['m1'][:, :, :, mask] = ma.masked
-        self.coeffsCov['m2'] = ma.MaskedArray(self.coeffsCov['m2'])
-        self.coeffsCov['m2'][:, :, :, :, mask] = ma.masked
+        self.coeffs_cov['m0'] = ma.MaskedArray(self.coeffs_cov['m0'])
+        if self.coeffs_cov['m0'][0, 0].shape == mask.shape: # Special case for m0 rwst coefficient as it is not possible for now to get local information.
+            self.coeffs_cov['m0'][:, :, mask] = ma.masked
+        self.coeffs_cov['m1'] = ma.MaskedArray(self.coeffs_cov['m1'])
+        self.coeffs_cov['m1'][:, :, :, mask] = ma.masked
+        self.coeffs_cov['m2'] = ma.MaskedArray(self.coeffs_cov['m2'])
+        self.coeffs_cov['m2'][:, :, :, :, mask] = ma.masked
 
-    def _set_coeffs(self, layer, jVals, coeffs, coeffsCov, chi2r):
+    def _set_coeffs(self, layer, jVals, coeffs, coeffs_cov, chi2r):
         """
         Internal functions. Set the values of the coefficients during the optimization (see RWSTOp.apply function).
 
@@ -91,7 +91,7 @@ class RWST:
             If layer == 1, j_1 value. If layer == 2, (j_1,j_2) values. Otherwise, ignored.
         coeffs : array
             Coefficients found during the optimization.
-        coeffsCov : array
+        coeffs_cov : array
             Covariance matrix corresponding to the coefficients.
         chi2r : TYPE
             Reduced chi square values for the corresponding optimization.
@@ -103,16 +103,16 @@ class RWST:
         """
         if layer == 0:
             self.coeffs['m0'] = coeffs
-            self.coeffsCov['m0'] = coeffsCov
+            self.coeffs_cov['m0'] = coeffs_cov
         elif layer == 1:
             self.coeffs['m1'][jVals, :-1] = coeffs
             self.coeffs['m1'][jVals, -1:] = chi2r
-            self.coeffsCov['m1'][jVals] = coeffsCov
+            self.coeffs_cov['m1'][jVals] = coeffs_cov
         elif layer == 2:
             j1, j2 = jVals
             self.coeffs['m2'][j1, j2, :-1] = coeffs
             self.coeffs['m2'][j1, j2, -1:] = chi2r
-            self.coeffsCov['m2'][j1, j2] = coeffsCov
+            self.coeffs_cov['m2'][j1, j2] = coeffs_cov
 
     def get_coeffs(self, name):
         """
@@ -122,7 +122,7 @@ class RWST:
         ----------
         name : str
             Can be 'S0' for layer 0 coefficients, 'chi2r1' or 'chi2r2' for reduced chi square values (for layer 1 and layer 2 optimization respectively),
-            or the name of a term of the corresponding model (consistent with model.layer1Names and model.layer2Names).
+            or the name of a term of the corresponding model (consistent with model.layer1_names and model.layer2_names).
 
         Raises
         ------
@@ -142,10 +142,10 @@ class RWST:
         elif name == 'chi2r2':
             return self.coeffs['m2'][:, :, -1]
         else:
-            for index, nameList in enumerate(self.model.layer1Names):
+            for index, nameList in enumerate(self.model.layer1_names):
                 if name == nameList:
                     return self.coeffs['m1'][:, index]
-            for index, nameList in enumerate(self.model.layer2Names):
+            for index, nameList in enumerate(self.model.layer2_names):
                 if name == nameList:
                     return self.coeffs['m2'][:, :, index]
         raise Exception("Unknown name of parameter: " + str(name))
@@ -158,7 +158,7 @@ class RWST:
         ----------
         name : str
             Can be 'S0' for layer 0 coefficients, or the name of a term of the corresponding model
-            (consistent with model.layer1Names and model.layer2Names).
+            (consistent with model.layer1_names and model.layer2_names).
 
         Raises
         ------
@@ -172,14 +172,14 @@ class RWST:
 
         """
         if name == 'S0':
-            return np.sqrt(self.coeffsCov['m0'][0, 0])
+            return np.sqrt(self.coeffs_cov['m0'][0, 0])
         else:
-            for index, nameList in enumerate(self.model.layer1Names):
+            for index, nameList in enumerate(self.model.layer1_names):
                 if name == nameList:
-                    return np.sqrt(self.coeffsCov['m1'][:, index, index])
-            for index, nameList in enumerate(self.model.layer2Names):
+                    return np.sqrt(self.coeffs_cov['m1'][:, index, index])
+            for index, nameList in enumerate(self.model.layer2_names):
                 if name == nameList:
-                    return np.sqrt(self.coeffsCov['m2'][:, :, index, index])
+                    return np.sqrt(self.coeffs_cov['m2'][:, :, index, index])
         raise Exception("Unknown name of parameter: " + str(name))
         
     def get_coeffs_cov(self, layer=None, j1=None, j2=None):
@@ -207,21 +207,21 @@ class RWST:
 
         """
         if layer == 0:
-            return self.coeffsCov['m0']
+            return self.coeffs_cov['m0']
         elif layer == 1:
             if j1 is None:
-                return self.coeffsCov['m1']
+                return self.coeffs_cov['m1']
             else:
-                return self.coeffsCov['m1'][j1]
+                return self.coeffs_cov['m1'][j1]
         elif layer == 2:
             if j1 is None and j2 is None:
-                return self.coeffsCov['m2']
+                return self.coeffs_cov['m2']
             elif j1 is None and j2 is not None:
-                return self.coeffsCov['m2'][:, j2]
+                return self.coeffs_cov['m2'][:, j2]
             elif j1 is not None and j2 is None:
-                return self.coeffsCov['m2'][j1, :]
+                return self.coeffs_cov['m2'][j1, :]
             else:
-                return self.coeffsCov['m2'][j1, j2]
+                return self.coeffs_cov['m2'][j1, j2]
         else:
             raise Exception("Choose a layer between 0 and 2!")
             
@@ -237,12 +237,12 @@ class RWST:
         """
         self.model.finalize(self)
             
-    def _theta_labels(self, thetaRange):
+    def _theta_labels(self, theta_range):
         """
-        Internal function. thetaRange must be an array of integers
+        Internal function. theta_range must be an array of integers
         """
         ret = []
-        for theta in thetaRange:
+        for theta in theta_range:
             s = ""
             if theta == 0:
                 s = "$0$"
@@ -275,7 +275,7 @@ class RWST:
         ----------
         names : list of str, optional
             List of coefficients we want to plot on the same figure.
-            Can be "chi2r1" or "chi2r2" for reduced chi square values, or names included in model.nbParamsLayer1 and model.nbParamsLayer2 variables.
+            Can be "chi2r1" or "chi2r2" for reduced chi square values, or names included in model.layer1_nbparams and model.layer2_nbparams variables.
             The default is [].
         label : str, optional
             Label for the legend. The default is "".
@@ -301,7 +301,7 @@ class RWST:
             RWST object or list of multiple RWST objects.
         names : list of str, optional
             List of coefficients we want to plot on the same figure.
-            Can be "chi2r1" or "chi2r2" for reduced chi square values, or names included in model.nbParamsLayer1 and model.nbParamsLayer2 variables.
+            Can be "chi2r1" or "chi2r2" for reduced chi square values, or names included in model.layer1_nbparams and model.layer2_nbparams variables.
             The default is [].
         labels : list of str, optional
             List of labels to identify the current object and the input objects.
@@ -326,8 +326,8 @@ class RWST:
                     raise Exception("Inconsistent RWST objects.")
             
         if names == []:
-            self.plot_compare(rwst_list, names=self.model.layer1Names, labels=labels)
-            self.plot_compare(rwst_list, names=self.model.layer2Names, labels=labels)
+            self.plot_compare(rwst_list, names=self.model.layer1_names, labels=labels)
+            self.plot_compare(rwst_list, names=self.model.layer2_names, labels=labels)
             self.plot_compare(rwst_list, names=["chi2r1", "chi2r2"], labels=labels)
         else:
             rwst_list_loc = [self] + rwst_list_loc # Add current object to rwst_list_loc
@@ -340,13 +340,13 @@ class RWST:
             indexLayer2 = []
             for name in names:
                 if name == "chi2r1":
-                    indexLayer1.append(self.model.nbParamsLayer1)
+                    indexLayer1.append(self.model.layer1_nbparams)
                 elif name == "chi2r2":
-                    indexLayer2.append(self.model.nbParamsLayer2)
-                for index, nameList in enumerate(self.model.layer1Names):
+                    indexLayer2.append(self.model.layer2_nbparams)
+                for index, nameList in enumerate(self.model.layer1_names):
                     if name == nameList:
                         indexLayer1.append(index)
-                for index, nameList in enumerate(self.model.layer2Names):
+                for index, nameList in enumerate(self.model.layer2_names):
                     if name == nameList:
                         indexLayer2.append(index)
                         
@@ -374,11 +374,11 @@ class RWST:
                 for rwst_index, rwst_curr in enumerate(rwst_list_loc): # For every RWST object in rwst_list
                 
                     # Get local parameters
-                    locShape = rwst_curr.coeffs['m0'].shape[1:]
+                    loc_shape = rwst_curr.coeffs['m0'].shape[1:]
                     # Get a mask associated to S0 coefficient if any local coefficient turns out to be masked (we assume uniform mask along coefficient index axis).
                     mask = ma.getmaskarray(rwst_curr.coeffs['m0'][0])
                     # Define an index of local positions that are not masked.
-                    validLocIndex = [loc for loc in np.ndindex(locShape) if mask[loc] == False]
+                    validLocIndex = [loc for loc in np.ndindex(loc_shape) if mask[loc] == False]
                     
                     j1Vals = np.arange(rwst_curr.J)
                     
@@ -388,8 +388,8 @@ class RWST:
                             color = colorCycle[color_cnt % len(colorCycle)]
                             
                             coeffs = rwst_curr.coeffs['m1'][np.index_exp[:, index] + locIndex]
-                            if index != rwst_curr.model.nbParamsLayer1: # No std for chi2r1
-                                coeffsStd = np.sqrt(rwst_curr.coeffsCov['m1'][np.index_exp[:, index, index] + locIndex])
+                            if index != rwst_curr.model.layer1_nbparams: # No std for chi2r1
+                                coeffsStd = np.sqrt(rwst_curr.coeffs_cov['m1'][np.index_exp[:, index, index] + locIndex])
                             else:
                                 coeffsStd = np.zeros(coeffs.shape)
                                 
@@ -407,9 +407,9 @@ class RWST:
                             color_cnt += 1
 
                         axs[pos].set_xlabel("$j_1$")
-                        if index != rwst_curr.model.nbParamsLayer1:
-                            axs[pos].set_ylabel(rwst_curr.model.layer1PlotParams[index][0])
-                            if rwst_curr.model.layer1PlotParams[index][1]: # Readable radian ylabels?
+                        if index != rwst_curr.model.layer1_nbparams:
+                            axs[pos].set_ylabel(rwst_curr.model.layer1_pltparams[index][0])
+                            if rwst_curr.model.layer1_pltparams[index][1]: # Readable radian ylabels?
                                 angleRange = np.arange((rwst_curr.coeffs['m1'][:, index].ravel().min() // (rwst_curr.L / 4)) * rwst_curr.L // 4, (rwst_curr.coeffs['m1'][:, index].ravel().max() // (rwst_curr.L / 4) + 2) * rwst_curr.L // 4, rwst_curr.L // 4)
                                 axs[pos].set_yticks(angleRange)
                                 axs[pos].set_yticklabels(rwst_curr._theta_labels(angleRange))
@@ -422,8 +422,8 @@ class RWST:
                             color = colorCycle[color_cnt % len(colorCycle)]
                             
                             coeffs = rwst_curr.coeffs['m2'][np.index_exp[:, :, index] + locIndex]
-                            if index != rwst_curr.model.nbParamsLayer2: # No std for chi2r2
-                                coeffsStd = np.sqrt(rwst_curr.coeffsCov['m2'][np.index_exp[:, :, index, index] + locIndex])
+                            if index != rwst_curr.model.layer2_nbparams: # No std for chi2r2
+                                coeffsStd = np.sqrt(rwst_curr.coeffs_cov['m2'][np.index_exp[:, :, index, index] + locIndex])
                             else:
                                 coeffsStd = np.zeros(coeffs.shape)
                             for j1 in np.arange(rwst_curr.J - 1):
@@ -448,9 +448,9 @@ class RWST:
                             color_cnt += 1
                         
                         axs[pos].set_xlabel("$j_2$")
-                        if index != rwst_curr.model.nbParamsLayer2:
-                            axs[pos].set_ylabel(rwst_curr.model.layer2PlotParams[index][0])
-                            if rwst_curr.model.layer2PlotParams[index][1]: # Readable radian ylabels?
+                        if index != rwst_curr.model.layer2_nbparams:
+                            axs[pos].set_ylabel(rwst_curr.model.layer2_pltparams[index][0])
+                            if rwst_curr.model.layer2_pltparams[index][1]: # Readable radian ylabels?
                                 angleRange = np.arange((rwst_curr.coeffs['m2'][:, :, index].ravel().min() // (rwst_curr.L / 4)) * rwst_curr.L // 4, (rwst_curr.coeffs['m2'][:, :, index].ravel().max() // (rwst_curr.L / 4) + 2) * rwst_curr.L // 4, rwst_curr.L // 4)
                                 axs[pos].set_yticks(angleRange)
                                 axs[pos].set_yticklabels(rwst_curr._theta_labels(angleRange))
@@ -518,7 +518,7 @@ class RWST:
         # We create the WST object and fill out its attributes
         wst = pw.WST(self.J, self.L, S, index=wst_index, cplx=cplx)
         wst.normalized = self.wst_normalized
-        wst.log2Vals = self.wst_log2Vals
+        wst.log2vals = self.wst_log2vals
         
         # TODO: add uncertainties to wst
         
