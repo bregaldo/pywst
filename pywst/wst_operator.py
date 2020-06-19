@@ -97,13 +97,14 @@ class WSTOp:
             bp_filters = []
             for i in range(len(results)):
                 bp_filters += results[i]
+            pool.close()
             
             for theta in range(self.L):
                 self.psi[j, theta] = {}
                 w = bp_filters[theta]
                 wF = fft(w).real # The imaginary part is null for Morlet wavelets
                 for res in range(j + 1):
-                    self.psi[j, theta][res] = subsample_fourier(wF, 2 ** res, normalize=True)
+                    self.psi[j, theta][res] = subsample_fourier(wF, 2 ** res, normalize=True, aa_filter=True)
             if self.cplx: # We also need rotations for theta in [pi, 2*pi)
                 for theta in range(self.L):
                     self.psi[j, theta + self.L] = {}
@@ -115,7 +116,7 @@ class WSTOp:
         g = lp_filter_cls(self.M, self.N, self.J - 1, sigma0=sigma0).data
         gF = np.real(fft(g)) # The imaginary part is null for Gaussian filters
         for res in range(self.J):
-            self.phi[res] = subsample_fourier(gF, 2 ** res, normalize=True)
+            self.phi[res] = subsample_fourier(gF, 2 ** res, normalize=True, aa_filter=True)
     
     def apply(self, data, local=False, crop=0.0):
         """
