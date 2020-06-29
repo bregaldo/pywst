@@ -127,7 +127,7 @@ class RWSTOp:
             for locIndex in validLocIndex: # Enumerate the index values corresponding to the shape loc_shape
                 # In the following, np.index_exp helps to concatenate slice() object and tuples.
                 # We get the optimized parameters paramsOpt and their corresponding covariance matrix. paramsOpt minimizes the chi squared statistics.
-                paramsOpt[np.index_exp[:] + locIndex], paramsCov[np.index_exp[:, :] + locIndex] = opt.curve_fit(model.layer1, theta1Vals, coeffs[np.index_exp[:] + locIndex], p0=np.ones(model.layer1_nbparams), sigma=coeffs_cov)
+                paramsOpt[np.index_exp[:] + locIndex], paramsCov[np.index_exp[:, :] + locIndex] = opt.curve_fit(model.layer1, theta1Vals, coeffs[np.index_exp[:] + locIndex], p0=np.ones(model.layer1_nbparams), sigma=coeffs_cov, maxfev=5000)
                 x = coeffs[np.index_exp[:] + locIndex] - model.layer1(theta1Vals, *tuple(paramsOpt[np.index_exp[:] + locIndex]))
                 chi2r[locIndex] = x.T @ la.inv(coeffs_cov) @ x / (len(x) - model.layer1_nbparams)
             rwst._set_coeffs(1, j1, paramsOpt, paramsCov, chi2r)
@@ -145,7 +145,7 @@ class RWSTOp:
                 for locIndex in validLocIndex: # Enumerate the index values corresponding to the shape loc_shape
                     # In the following, np.index_exp helps to concatenate slice() object and tuples.
                     # We get the optimized parameters paramsOpt and their corresponding covariance matrix. paramsOpt minimizes the chi squared statistics.
-                    paramsOpt[np.index_exp[:] + locIndex], paramsCov[np.index_exp[:, :] + locIndex] = opt.curve_fit(model.layer2, thetaVals, coeffs[np.index_exp[:] + locIndex], p0=np.ones(model.layer2_nbparams), sigma=coeffs_cov)
+                    paramsOpt[np.index_exp[:] + locIndex], paramsCov[np.index_exp[:, :] + locIndex] = opt.curve_fit(model.layer2, thetaVals, coeffs[np.index_exp[:] + locIndex], p0=np.ones(model.layer2_nbparams), sigma=coeffs_cov, maxfev=5000)
                     x = coeffs[np.index_exp[:] + locIndex] - model.layer2(thetaVals, *tuple(paramsOpt[np.index_exp[:] + locIndex]))
                     chi2r[locIndex] = x.T @ la.inv(coeffs_cov) @ x / (len(x) - model.layer2_nbparams)
                 rwst._set_coeffs(2, (j1, j2), paramsOpt, paramsCov, chi2r)
