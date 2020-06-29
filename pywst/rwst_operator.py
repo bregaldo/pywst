@@ -55,7 +55,7 @@ class RWSTOp:
                 self.wst_op = WSTOp(M, N, J, L, OS, cplx)
         self.model = model
     
-    def apply(self, data, local=False, crop=0.0):
+    def apply(self, data, local=False, crop=0.0, diag_cov=True):
         """
         Compute the RWST of input data or from a set of pre-computed WST coefficients.
         
@@ -71,6 +71,8 @@ class RWSTOp:
         crop : float, optional
             For non-periodic images, local coefficients at the borders may need to be cropped. Applicable if data is an image or a batch of images.
             Width of the cropping in 2^J pixels unit before downsampling (i.e. crop = 1 corresponds to 2^J pixels cropped before downsampling).
+        diag_cov : bool, optional
+            Only use the diagonal coefficients of the covariance matrix for curve_fit.
 
         Raises
         ------
@@ -118,7 +120,9 @@ class RWSTOp:
         # Layer 1 coefficients
         for j1 in range(self.J):
             coeffs, coeffsIndex = wst.get_coeffs(layer=1, j1=j1)
-            coeffs_cov, coeffsIndex = wst.get_coeffs_cov(layer=1, j1=j1)
+            coeffs_cov, coeffsIndex = wst.get_coeffs_cov(layer=1, j1=j1, autoremove_offdiag=not diag_cov)
+            if diag_cov: # Only keep diagonal coefficients if required
+                coeffs_cov = np.diag(np.diag(coeffs_cov))
             theta1Vals = coeffsIndex[2]
             
             paramsOpt = np.zeros((model.layer1_nbparams,) + loc_shape)
@@ -136,7 +140,9 @@ class RWSTOp:
         for j1 in range(self.J):
             for j2 in range(j1 + 1, self.J):
                 coeffs, coeffsIndex = wst.get_coeffs(layer=2, j1=j1, j2=j2)
-                coeffs_cov, coeffsIndex = wst.get_coeffs_cov(layer=2, j1=j1, j2=j2)
+                coeffs_cov, coeffsIndex = wst.get_coeffs_cov(layer=2, j1=j1, j2=j2, autoremove_offdiag=not diag_cov)
+                if diag_cov: # Only keep diagonal coefficients if required
+                    coeffs_cov = np.diag(np.diag(coeffs_cov))
                 thetaVals = (coeffsIndex[2], coeffsIndex[4])
                 
                 paramsOpt = np.zeros((model.layer2_nbparams,) + loc_shape)
