@@ -133,7 +133,7 @@ class WST:
         for i in range(coeffsCopy.shape[0]):
             self.coeffs[i, ...] = coeffsCopy[reorderIndex[i], ...]
                 
-    def _filter_args(self, **kwargs):
+    def _filter_args(self, layer=None, j1=None, theta1=None, j2=None, theta2=None):
         """
         Internal function to filter coefficients.
 
@@ -157,20 +157,19 @@ class WST:
 
         """
         filtering = np.ones(self.index.shape[1], np.bool)
-        for key, value in kwargs.items():
-            if key == "layer":
-                filtering = np.logical_and(filtering, self.index[0] == value)
-            elif key == "j1":
-                filtering = np.logical_and(filtering, self.index[1] == value)
-            elif key == "theta1":
-                filtering = np.logical_and(filtering, self.index[2] == value)
-            elif key == "j2":
-                filtering = np.logical_and(filtering, self.index[3] == value)
-            elif key == "theta2":
-                filtering = np.logical_and(filtering, self.index[4] == value)
+        if layer is not None:
+            filtering = np.logical_and(filtering, self.index[0] == layer)
+        if j1 is not None:
+            filtering = np.logical_and(filtering, self.index[1] == j1)
+        if theta1 is not None:
+            filtering = np.logical_and(filtering, self.index[2] == theta1)
+        if j2 is not None:
+            filtering = np.logical_and(filtering, self.index[3] == j2)
+        if theta2 is not None:
+            filtering = np.logical_and(filtering, self.index[4] == theta2)
         return filtering
             
-    def get_coeffs(self, **kwargs):
+    def get_coeffs(self, layer=None, j1=None, theta1=None, j2=None, theta2=None):
         """
         Return the selected coefficients.
 
@@ -195,12 +194,46 @@ class WST:
             Index of the coefficients.
 
         """
-        filtering = self._filter_args(**kwargs)
+        filtering = self._filter_args(layer=layer, j1=j1, theta1=theta1, j2=j2, theta2=theta2)
         return self.coeffs[filtering, ...], self.index[:, filtering]
-        
-    def normalize(self, log2=True):
+    
+    def to_log2(self):
         """
-        Normalization of the coefficients and computation of logarithmic coefficients (binary logarithm).
+        Computation of logarithmic coefficients (binary logarithm).
+
+        Returns
+        -------
+        None.
+
+        """
+        if not self.log2vals:
+            # Compute the relevant covariance matrix, then compute log2 coefficients.
+            if self.coeffs_cov is not None:
+                warnings.warn("Warning! The covariance matrix has already been computed with linear coefficients. We compute logarithmic errors from diagonal coefficients and discard off-diagonal coefficients.")
+                self.coeffs_cov = np.diag(np.diag(self.coeffs_cov)/(self.coeffs*np.log(2))**2)
+            self.coeffs = np.log2(self.coeffs)
+            self.log2vals = True
+            
+    def to_linear(self):
+        """
+        Turn binary logarithmic coefficients into linear coefficients.
+
+        Returns
+        -------
+        None.
+
+        """
+        if self.log2vals:
+            # Compute linear coefficients, then compute the relevant covariance matrix.
+            self.coeffs = 2 ** self.coeffs
+            if self.coeffs_cov is not None:
+                warnings.warn("Warning! The covariance matrix has already been computed with logarithmic coefficients. We compute linear errors from diagonal coefficients and discard off-diagonal coefficients.")
+                self.coeffs_cov = np.diag(np.diag(self.coeffs_cov)*(self.coeffs*np.log(2))**2)
+            self.log2vals = False
+        
+    def normalize(self):
+        """
+        Normalization of the coefficients.
         
         Layer 0 coefficients are left unchanged.
         Layer 1 coefficients are normalized by layer 0 coefficients (locally if available):
@@ -215,11 +248,6 @@ class WST:
             
             \\bar{S}_2(j_1,\\theta_1,j_2,\\theta_2) = S_2(j_1,\\theta_1,j_2,\\theta_2)/S_1(j_1,\\theta_1)
 
-        Parameters
-        ----------
-        log2 : TYPE, optional
-            Compute the binary logarithm of the normalized coefficients. The default is True.
-
         Returns
         -------
         None.
@@ -232,19 +260,50 @@ class WST:
             coeffsCopy = self.coeffs.copy()
             cnt = 1
             for j1 in range(self.J):
-                self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] /= coeffsCopy[:1, ...]
+                if self.log2vals:
+                    self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] -= coeffsCopy[:1, ...]
+                else:
+                    self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] /= coeffsCopy[:1, ...]
                 cnt += self.L * (1 + self.cplx)
             for j1 in range(self.J):
                 for theta1 in range(self.L * (1 + self.cplx)):
                     index = 1 + j1 * self.L * (1 + self.cplx) + theta1
-                    self.coeffs[cnt:cnt + self.L * (self.J - j1 - 1), ...] /= coeffsCopy[index:index + 1, ...]
+                    if self.log2vals:
+                        self.coeffs[cnt:cnt + self.L * (self.J - j1 - 1), ...] -= coeffsCopy[index:index + 1, ...]
+                    else:
+                        self.coeffs[cnt:cnt + self.L * (self.J - j1 - 1), ...] /= coeffsCopy[index:index + 1, ...]
                     cnt += self.L * (self.J - j1 - 1)
             self.normalized = True
+            
+    def unnormalize(self):
+        """
+        Cancel the normalization of the coefficients. See normalize() method.
+
+        Returns
+        -------
+        None.
+
+        """
+        if self.coeffs_cov is not None:
+            warnings.warn("Warning! The covariance matrix has been computed before the unnormalization and will not be updated.")
         
-        if not self.log2vals:
-            if log2:
-                self.coeffs = np.log2(self.coeffs)
-                self.log2vals = True
+        if self.normalized:
+            cnt = 1
+            for j1 in range(self.J):
+                if self.log2vals:
+                    self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] += self.coeffs[:1, ...]
+                else:
+                    self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] *= self.coeffs[:1, ...]
+                cnt += self.L * (1 + self.cplx)
+            for j1 in range(self.J):
+                for theta1 in range(self.L * (1 + self.cplx)):
+                    index = 1 + j1 * self.L * (1 + self.cplx) + theta1
+                    if self.log2vals:
+                        self.coeffs[cnt:cnt + self.L * (self.J - j1 - 1), ...] += self.coeffs[index:index + 1, ...]
+                    else:
+                        self.coeffs[cnt:cnt + self.L * (self.J - j1 - 1), ...] *= self.coeffs[index:index + 1, ...]
+                    cnt += self.L * (self.J - j1 - 1)
+            self.normalized = False
                 
     def average(self):
         """
@@ -268,7 +327,7 @@ class WST:
             else:
                 samples = coeffsCopy.shape[-1]
                 
-            coeffs_cov = ma.cov(coeffsCopy) / samples # Masked array covariance function to properly handle masked coefficients.
+            coeffs_cov = (ma.cov(coeffsCopy) / samples).data # Masked array covariance function to properly handle masked coefficients.
             
             self.coeffs = coeffsCopy.mean(axis=-1)
             self.coeffs_cov = coeffs_cov
@@ -277,7 +336,7 @@ class WST:
             self.batch = False
             self.local = False
         
-    def get_coeffs_cov(self, autoremove_offdiag=True, **args):
+    def get_coeffs_cov(self, autoremove_offdiag=True, layer=None, j1=None, theta1=None, j2=None, theta2=None):
         """
         Return the covariance matrix corresponding to the selected coefficients.
 
@@ -305,7 +364,7 @@ class WST:
         array
             Index of the selected coefficients.
         """
-        filtering = self._filter_args(**args)
+        filtering = self._filter_args(layer=layer, j1=j1, theta1=theta1, j2=j2, theta2=theta2)
         if self.coeffs_cov is None:
             warnings.warn("Warning! Covariance matrix is None.")
             return np.eye(np.sum(filtering)), self.index[:, filtering]

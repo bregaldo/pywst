@@ -91,10 +91,12 @@ class RWSTOp:
             if wst.J != self.J:
                 raise Exception("Inconsistent J values between RWST operator and input WST coefficients.")
             if not wst.log2vals:
-                warnings.warn("Input WST coefficients should have logarithmic values.")
+                warnings.warn("Input WST coefficients must have logarithmic values. Auto-computation of logarithmic coefficients...")
+                wst.to_log2()
         else:
             wst = self.wst_op.apply(data, local, crop=crop)
-            wst.normalize(log2=True)
+            wst.to_log2()
+            wst.normalize()
             if not local:
                 wst.average()
         
