@@ -200,6 +200,8 @@ class WST:
     def to_log2(self):
         """
         Computation of logarithmic coefficients (binary logarithm).
+        
+        If coeffs_cov is not None, keep diagonal coefficients and divide them by (coeffs*log(2))^2 to estimate logarithmic errors at first order.
 
         Returns
         -------
@@ -217,6 +219,8 @@ class WST:
     def to_linear(self):
         """
         Turn binary logarithmic coefficients into linear coefficients.
+        
+        If coeffs_cov is not None, keep diagonal coefficients and multiply them by (2^coeffs*log(2))^2 to estimate linear errors at first order.
 
         Returns
         -------
