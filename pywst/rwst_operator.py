@@ -17,7 +17,7 @@ class RWSTOp:
     Reduced Wavelet Scattering Transform (RWST) operator.
     """
     
-    def __init__(self, M, N, J, L=8, OS=0, cplx=False, model=RWSTModel1, wst_op=None):
+    def __init__(self, M, N, J, L=8, OS=0, cplx=False, model_cls=RWSTModel1, wst_op=None):
         """
         Constructor.
         
@@ -35,7 +35,7 @@ class RWSTOp:
             Oversampling parameter. The default is 0.
         cplx : bool, optional
             Set it to true if the RWSTOp instance will ever apply to complex data. This would load in memory the whole set of bandpass filters. The default is False.
-        model : type, optional
+        model_cls : type, optional
             Class of the RWST model of the angular dependencies. The default is RWSTModel1.
         wst_op : WSTOp, optional
             WSTOp object with consistent parameters that avoids multiple filters loading.
@@ -53,7 +53,7 @@ class RWSTOp:
             else:
                 warnings.warn("Warning! Loading WSTOp new instance because of wst_op inconsistencies.")
                 self.wst_op = WSTOp(M, N, J, L, OS, cplx)
-        self.model = model
+        self.model_cls = model_cls
     
     def apply(self, data, local=False, crop=0.0, diag_cov=True):
         """
@@ -105,7 +105,7 @@ class RWSTOp:
         # Define an index of local positions that are not masked.
         validLocIndex = [loc for loc in np.ndindex(loc_shape) if mask[loc] == False]
         
-        model = self.model(self.L)
+        model = self.model_cls(self.L)
         rwst = RWST(self.J, self.L, model, loc_shape=loc_shape)
         
         # We keep relevant information on the WST object

@@ -32,6 +32,27 @@ class RWSTModelBase (ABC):
         self.layer1_nbparams = len(self.layer1_names)
         self.layer2_nbparams = len(self.layer2_names)
         
+    def __str__(self):
+        """
+        String description of the model.
+
+        Returns
+        -------
+        None.
+
+        """
+        s = "Model: " + type(self).__name__ + "\n"
+        s += "--> Layer 0 coefficient: S0\n"
+        s += "--> Layer 1 coefficients: "
+        for name in self.layer1_names:
+            s += name + " - "
+        s = s[:-3] + "\n"
+        s += "--> Layer 2 coefficients: "
+        for name in self.layer2_names:
+            s += name + " - "
+        s = s[:-3]
+        return s
+        
     @abstractmethod
     def layer1(self, theta_vals, *params):
         """
