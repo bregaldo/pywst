@@ -1,4 +1,6 @@
 examples/.ipynb_checkpoints/
 *.pyc
 *.pyo
+examples/TestScatnet/
+examples/demo_EA.ipynb
 .DS_Store
