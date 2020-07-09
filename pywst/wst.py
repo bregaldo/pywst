@@ -381,6 +381,33 @@ class WST:
                 warnings.warn("Warning! Removing off diagonal coefficients of the sample covariance matrix (only " + str(self.coeffs_cov_nbsamples) + " samples for dimension " + str(dim) + ").")
             return covM, self.index[:, filtering]
         
+    def get_coeffs_std(self, layer=None, j1=None, theta1=None, j2=None, theta2=None):
+        """
+        Return the standard deviations corresponding to the selected coefficients.
+
+        Parameters
+        ----------
+        layer : int, optional
+            Selection of the layer of coefficients (0, 1 or 2). The default is all layers.
+        j1 : int, optional
+            Selection of a specific j_1 values. The default is all j_1 values.
+        theta1 : int, optional
+            Selection of a specific theta_1 values. The default is all theta_1 values.
+        j2 : int, optional
+            Selection of a specific j_2 values. The default is all j_2 values.
+        theta2 : int, optional
+            Selection of a specific theta_2 values. The default is all theta_2 values.
+
+        Returns
+        -------
+        array
+            Standard deviations corresponding to the selected coefficients.
+        array
+            Index of the selected coefficients.
+        """
+        cov, index = self.get_coeffs_cov(layer=layer, j1=j1, theta1=theta1, j2=j2, theta2=theta2)
+        return np.sqrt(np.diag(cov)), index
+        
     def _plot(self, axis, x, y, ylabel, legend="", err=None, j1ticks=True):
         """
         Internal plot function.

@@ -55,7 +55,7 @@ class RWSTOp:
                 self.wst_op = WSTOp(M, N, J, L, OS, cplx)
         self.model_cls = model_cls
     
-    def apply(self, data, local=False, crop=0.0, diag_cov=True):
+    def apply(self, data, local=False, wst_average=False, crop=0.0, diag_cov=True):
         """
         Compute the RWST of input data or from a set of pre-computed WST coefficients.
         
@@ -67,7 +67,9 @@ class RWSTOp:
             WST object containing pre-computed WST coefficients or input data.
             2D (one image) or 3D array (batch of images).
         local : bool, optional
-            Do we need local coefficients? Applicable if data is an image or a batch of images. The default is False.
+            Do we need local WST coefficients? Applicable if data is an image or a batch of images. The default is False.
+        wst_average : bool, optional
+            WST average before RWST computation? Applicable if data is an image or a batch of images. The default is False.
         crop : float, optional
             For non-periodic images, local coefficients at the borders may need to be cropped. Applicable if data is an image or a batch of images.
             Width of the cropping in 2^J pixels unit before downsampling (i.e. crop = 1 corresponds to 2^J pixels cropped before downsampling).
@@ -97,7 +99,7 @@ class RWSTOp:
             wst = self.wst_op.apply(data, local, crop=crop)
             wst.to_log2()
             wst.normalize()
-            if not local:
+            if wst_average:
                 wst.average()
         
         # Get the shape of the local information (batch + local coefficients per map)
