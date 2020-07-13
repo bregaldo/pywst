@@ -118,14 +118,22 @@ class RWSTOp:
         
         # Layer 0 coefficient
         coeffs, coeffsIndex = wst.get_coeffs(layer=0)
-        coeffs_cov, coeffsIndex = wst.get_coeffs_cov(layer=0)
+        coeffs_cov, _ = wst.get_coeffs_cov(layer=0)
         rwst._set_coeffs(0, None, coeffs, coeffs_cov, None)
+        
+        ##
+        # Note on curve_fit/absolute_sigma parameter:
+        # If coeffs_cov is None, we set absolute_sigma to False, otherwise it is True.
+        # coeffs_cov absolute values are meaningful, this is why we need absolute_sigma=True,
+        # but when coeffs_cov is None, the default value used by curve_fit is an identity matrix,
+        # that is why we need absolute_sigma=False in this case.
+        ##
 
         # Layer 1 coefficients
         for j1 in range(self.J):
             coeffs, coeffsIndex = wst.get_coeffs(layer=1, j1=j1)
-            coeffs_cov, coeffsIndex = wst.get_coeffs_cov(layer=1, j1=j1, autoremove_offdiag=not diag_cov)
-            if diag_cov: # Only keep diagonal coefficients if required
+            coeffs_cov, _ = wst.get_coeffs_cov(layer=1, j1=j1, autoremove_offdiag=not diag_cov)
+            if diag_cov and coeffs_cov is not None: # Only keep diagonal coefficients if required
                 coeffs_cov = np.diag(np.diag(coeffs_cov))
             theta1Vals = coeffsIndex[2]
             
@@ -135,17 +143,22 @@ class RWSTOp:
             for locIndex in validLocIndex: # Enumerate the index values corresponding to the shape loc_shape
                 # In the following, np.index_exp helps to concatenate slice() object and tuples.
                 # We get the optimized parameters paramsOpt and their corresponding covariance matrix. paramsOpt minimizes the chi squared statistics.
-                paramsOpt[np.index_exp[:] + locIndex], paramsCov[np.index_exp[:, :] + locIndex] = opt.curve_fit(model.layer1, theta1Vals, coeffs[np.index_exp[:] + locIndex], p0=np.ones(model.layer1_nbparams), sigma=coeffs_cov, maxfev=5000)
+                res = opt.curve_fit(model.layer1, theta1Vals, coeffs[np.index_exp[:] + locIndex],
+                                    p0=np.ones(model.layer1_nbparams), sigma=coeffs_cov, absolute_sigma=coeffs_cov is not None, maxfev=5000)
+                paramsOpt[np.index_exp[:] + locIndex], paramsCov[np.index_exp[:, :] + locIndex] = res
                 x = coeffs[np.index_exp[:] + locIndex] - model.layer1(theta1Vals, *tuple(paramsOpt[np.index_exp[:] + locIndex]))
-                chi2r[locIndex] = x.T @ la.inv(coeffs_cov) @ x / (len(x) - model.layer1_nbparams)
+                if coeffs_cov is not None:
+                    chi2r[locIndex] = x.T @ la.inv(coeffs_cov) @ x / (len(x) - model.layer1_nbparams)
+                else:
+                    chi2r[locIndex] = x.T @ x / (len(x) - model.layer1_nbparams)
             rwst._set_coeffs(1, j1, paramsOpt, paramsCov, chi2r)
             
         # Layer 2 coefficients
         for j1 in range(self.J):
             for j2 in range(j1 + 1, self.J):
                 coeffs, coeffsIndex = wst.get_coeffs(layer=2, j1=j1, j2=j2)
-                coeffs_cov, coeffsIndex = wst.get_coeffs_cov(layer=2, j1=j1, j2=j2, autoremove_offdiag=not diag_cov)
-                if diag_cov: # Only keep diagonal coefficients if required
+                coeffs_cov, _ = wst.get_coeffs_cov(layer=2, j1=j1, j2=j2, autoremove_offdiag=not diag_cov)
+                if diag_cov and coeffs_cov is not None: # Only keep diagonal coefficients if required
                     coeffs_cov = np.diag(np.diag(coeffs_cov))
                 thetaVals = (coeffsIndex[2], coeffsIndex[4])
                 
@@ -155,9 +168,14 @@ class RWSTOp:
                 for locIndex in validLocIndex: # Enumerate the index values corresponding to the shape loc_shape
                     # In the following, np.index_exp helps to concatenate slice() object and tuples.
                     # We get the optimized parameters paramsOpt and their corresponding covariance matrix. paramsOpt minimizes the chi squared statistics.
-                    paramsOpt[np.index_exp[:] + locIndex], paramsCov[np.index_exp[:, :] + locIndex] = opt.curve_fit(model.layer2, thetaVals, coeffs[np.index_exp[:] + locIndex], p0=np.ones(model.layer2_nbparams), sigma=coeffs_cov, maxfev=5000)
+                    res = opt.curve_fit(model.layer2, thetaVals, coeffs[np.index_exp[:] + locIndex],
+                                        p0=np.ones(model.layer2_nbparams), sigma=coeffs_cov, absolute_sigma=coeffs_cov is not None, maxfev=5000)
+                    paramsOpt[np.index_exp[:] + locIndex], paramsCov[np.index_exp[:, :] + locIndex] = res
                     x = coeffs[np.index_exp[:] + locIndex] - model.layer2(thetaVals, *tuple(paramsOpt[np.index_exp[:] + locIndex]))
-                    chi2r[locIndex] = x.T @ la.inv(coeffs_cov) @ x / (len(x) - model.layer2_nbparams)
+                    if coeffs_cov is not None:
+                        chi2r[locIndex] = x.T @ la.inv(coeffs_cov) @ x / (len(x) - model.layer2_nbparams)
+                    else:
+                        chi2r[locIndex] = x.T @ x / (len(x) - model.layer1_nbparams)
                 rwst._set_coeffs(2, (j1, j2), paramsOpt, paramsCov, chi2r)
         
         rwst._finalize() # Deal with potential model parameters degeneracies

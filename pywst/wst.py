@@ -370,8 +370,7 @@ class WST:
         """
         filtering = self._filter_args(layer=layer, j1=j1, theta1=theta1, j2=j2, theta2=theta2)
         if self.coeffs_cov is None:
-            warnings.warn("Warning! Covariance matrix is None.")
-            return np.eye(np.sum(filtering)), self.index[:, filtering]
+            return None, self.index[:, filtering]
         else:
             dim = np.sum(filtering)
             covM = self.coeffs_cov[np.outer(filtering, filtering)].reshape(dim, dim)
@@ -406,7 +405,10 @@ class WST:
             Index of the selected coefficients.
         """
         cov, index = self.get_coeffs_cov(layer=layer, j1=j1, theta1=theta1, j2=j2, theta2=theta2)
-        return np.sqrt(np.diag(cov)), index
+        if cov is None:
+            return None, index
+        else:
+            return np.sqrt(np.diag(cov)), index
         
     def _plot(self, axis, x, y, ylabel, legend="", err=None, j1ticks=True):
         """

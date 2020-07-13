@@ -103,7 +103,7 @@ class RWST:
         """
         if layer == 0:
             self.coeffs['m0'] = coeffs
-            self.coeffs_cov['m0'] = coeffs_cov
+            self.coeffs_cov['m0'][:] = coeffs_cov
         elif layer == 1:
             self.coeffs['m1'][jVals, :-1] = coeffs
             self.coeffs['m1'][jVals, -1:] = chi2r
