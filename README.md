@@ -1,42 +1,35 @@
-pywst : WST and RWST for astrophysics
-=====================================
+# PyWST : WST and RWST for astrophysics
 
-This package is designed to easily perform WST and RWST analysis for astrophysical data.
+PyWST is a public Python package designed to perform statistical analyses of two-dimensional data with the Wavelet Scattering Transform (WST) and the Reduced Wavelet Scattering Transform (RWST).
 
-Features:
-* Computation of the WST of real and complex images, locally or globally.
-* Computation of the RWST of real and complex images based on a RWST model, locally or globally.
-* Possibility to work with a batch of images.
-* Two standard RWST models are proposed and one can easily implement his own model.
-* Convenient handling of WST and RWST coefficients.
-* Control on the normalization of WST coefficients and on the computation of means of local coefficients.
-* Easy visualization of WST and RWST coefficients.
-* Comparisons of WST and RWST coefficients.
+The WST/RWST gives you a convenient set of coefficients that describe your non-Gaussian data in a comprehensive way.
 
-# Install/Uninstall
+Install PyWST and check out our [Jupyter notebook tutorial](examples/tutorial.ipynb)!
 
-## Install from source
+If you use this package, please cite the following paper:
+B. Regaldo-Saint Blancard, F. Levrier, E. Allys, E. Bellomi, F. Boulanger (2020). Statistical description of dust polarized emission from the diffuse interstellar medium - A WST/RWST approach. arXiv preprint arXiv:????
 
-pip install -r requirements.txt
+## Install/Uninstall
 
-pip install .
+### Standard installation (from the Python Package Index)
 
-## Standard installation (from the Python Package Index) [coming...]
+Type in a console:
 
-pip install pywst
+> pip install pywst
 
-## Uninstall
+### Install from source
 
-pip uninstall pywst
+Clone the repository and type from the main directory:
 
-# Todo
+> pip install -r requirements.txt
+> pip install .
 
-- Configure Sphinx documentation.
-- Upload package to the Python Package Index.
-- Set the repository public.
+### Uninstall
 
-# Changelog
+> pip uninstall pywst
 
-## 0.1 [coming...]
+## Changelog
 
-- First distributable version of pywst.
+### 0.9
+
+* First public version.
