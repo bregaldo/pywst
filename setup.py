@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="PyWST",
+    name="pywst",
     version="0.9",
     author="Bruno Régaldo-Saint Blancard",
     author_email="bruno.regaldo@phys.ens.fr",
