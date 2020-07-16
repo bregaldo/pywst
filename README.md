@@ -18,7 +18,6 @@ Type in a console:
 
 ```
 pip install pywst
-
 ```
 
 ### Install from source
@@ -28,14 +27,12 @@ Clone the repository and type from the main directory:
 ```
 pip install -r requirements.txt
 pip install .
-
 ```
 
 ### Uninstall
 
 ```
 pip uninstall pywst
-
 ```
 
 ## Changelog
