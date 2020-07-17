@@ -8,7 +8,7 @@ Install PyWST and check out our [Jupyter notebook tutorial](examples/tutorial.ip
 
 If you use this package, please cite the following paper:
 
-B. Regaldo-Saint Blancard, F. Levrier, E. Allys, E. Bellomi, F. Boulanger (2020). Statistical description of dust polarized emission from the diffuse interstellar medium - A WST/RWST approach. arXiv preprint arXiv:????
+B. Regaldo-Saint Blancard, F. Levrier, E. Allys, E. Bellomi, F. Boulanger (2020). Statistical description of dust polarized emission from the diffuse interstellar medium - A WST/RWST approach. arXiv preprint [arXiv:2007.08242](https://arxiv.org/abs/2007.08242)
 
 ## Install/Uninstall
 
