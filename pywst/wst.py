@@ -208,7 +208,7 @@ class WST:
 
         Returns
         -------
-        None.
+        self
 
         """
         if not self.log2vals:
@@ -218,6 +218,7 @@ class WST:
                 self.coeffs_cov = np.diag(np.diag(self.coeffs_cov)/(self.coeffs*np.log(2))**2)
             self.coeffs = np.log2(self.coeffs)
             self.log2vals = True
+        return self
             
     def to_linear(self):
         """
@@ -227,7 +228,7 @@ class WST:
 
         Returns
         -------
-        None.
+        self
 
         """
         if self.log2vals:
@@ -237,6 +238,7 @@ class WST:
                 warnings.warn("Warning! The covariance matrix has already been computed with logarithmic coefficients. We compute linear errors from diagonal coefficients and discard off-diagonal coefficients.")
                 self.coeffs_cov = np.diag(np.diag(self.coeffs_cov)*(self.coeffs*np.log(2))**2)
             self.log2vals = False
+        return self
         
     def normalize(self):
         """
@@ -257,7 +259,7 @@ class WST:
 
         Returns
         -------
-        None.
+        self
 
         """
         if self.coeffs_cov is not None:
@@ -281,6 +283,7 @@ class WST:
                         self.coeffs[cnt:cnt + self.L * (self.J - j1 - 1), ...] /= coeffsCopy[index:index + 1, ...]
                     cnt += self.L * (self.J - j1 - 1)
             self.normalized = True
+        return self
             
     def unnormalize(self):
         """
@@ -288,7 +291,7 @@ class WST:
 
         Returns
         -------
-        None.
+        self
 
         """
         if self.coeffs_cov is not None:
@@ -311,6 +314,7 @@ class WST:
                         self.coeffs[cnt:cnt + self.L * (self.J - j1 - 1), ...] *= self.coeffs[index:index + 1, ...]
                     cnt += self.L * (self.J - j1 - 1)
             self.normalized = False
+        return self
                 
     def average(self):
         """
@@ -320,7 +324,7 @@ class WST:
 
         Returns
         -------
-        None.
+        self
 
         """
         if self.batch or self.local: # We need multiple samples to average
@@ -342,6 +346,7 @@ class WST:
             
             self.batch = False
             self.local = False
+        return self
         
     def get_coeffs_cov(self, autoremove_offdiag=True, layer=None, j1=None, theta1=None, j2=None, theta2=None):
         """
