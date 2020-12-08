@@ -26,7 +26,7 @@ class WSTOp:
     Wavelet Scattering Transform (WST) operator.
     """
     
-    def __init__(self, M, N, J, L=8, OS=0, cplx=False, lp_filter_cls=GaussianFilter, bp_filter_cls=MorletWavelet):
+    def __init__(self, M, N, J, L=8, OS=0, cplx=False, lp_filter_cls=GaussianFilter, bp_filter_cls=MorletWavelet, j_min=0):
         """
         Constructor.
         
@@ -50,6 +50,8 @@ class WSTOp:
             Class corresponding to the low-pass filter. The default is GaussianFilter.
         bp_filter_cls : type, optional
             Class corresponding to the bandpass filter. The default is MorletWavelet.
+        j_min : type, optional
+            Minimum dyadic scale. The default is 0.
 
         Returns
         -------
@@ -59,7 +61,7 @@ class WSTOp:
         if M % 2 ** J != 0 or N % 2 ** J != 0:
             raise Exception("Choose values for M and N that are proportional to 2^J.")
         
-        self.M, self.N, self.J, self.L, self.OS, self.cplx = M, N, J, L, OS, cplx
+        self.M, self.N, self.J, self.L, self.OS, self.cplx, self.j_min = M, N, J, L, OS, cplx, j_min
         self.load_filters(lp_filter_cls, bp_filter_cls)
         
     def load_filters(self, lp_filter_cls, bp_filter_cls):
@@ -87,7 +89,7 @@ class WSTOp:
         k0 = 3 * np.pi / 4  # Central wavenumber of the mother wavelet
         
         # Build psi filters
-        for j in range(self.J):
+        for j in range(self.j_min, self.J):
             # Parallel pre-build
             build_bp_para_loc = partial(_build_bp_para, bp_filter_cls=bp_filter_cls, M=self.M, N=self.N, j=j, L=self.L, gamma=gamma, sigma0=sigma0, k0=k0)
             nb_processes = os.cpu_count()
@@ -103,12 +105,12 @@ class WSTOp:
                 self.psi[j, theta] = {}
                 w = bp_filters[theta]
                 wF = fft(w).real # The imaginary part is null for Morlet wavelets
-                for res in range(j + 1):
+                for res in range(max(j + 1, 1)):
                     self.psi[j, theta][res] = subsample_fourier(wF, 2 ** res, normalize=True, aa_filter=True)
             if self.cplx: # We also need rotations for theta in [pi, 2*pi)
                 for theta in range(self.L):
                     self.psi[j, theta + self.L] = {}
-                    for res in range(j + 1):
+                    for res in range(max(j + 1, 1)):
                         # Optimization trick for Morlet wavelets
                         self.psi[j, theta + self.L][res] = fft(np.conjugate(ifft(self.psi[j, theta][res]))).real
         
@@ -152,6 +154,7 @@ class WSTOp:
         phi = self.phi
         psi = self.psi
         locCplx = self.cplx
+        j_min = self.j_min
         
         # Check if we are dealing with a batch of images or not.
         if not (data.ndim == 2 or data.ndim == 3):
@@ -194,7 +197,7 @@ class WSTOp:
         SIndex.append([0, 0, 0, 0, 0])
     
         # First layer
-        for j1 in range(J):
+        for j1 in range(j_min, J):
             for theta1 in range((locCplx + 1) * L): # Note the trick to produce 2 when locCplx == True, and 1 otherwise
                 U1 = subsample_fourier(U0 * psi[j1, theta1][resU0], 2 ** max(j1 - resU0 - OS, 0))
                 U1 = fft(modulus(ifft(U1)))
@@ -237,4 +240,4 @@ class WSTOp:
                 raise Exception("No valid data remains after cropping.")
             S = ma.MaskedArray(S, mask=mask) # We create a numpy masked array to mask the cropped coefficients.
                         
-        return WST(J, L, S, index=np.array(SIndex).T, cplx=locCplx)
+        return WST(J, L, S, index=np.array(SIndex).T, cplx=locCplx, j_min=j_min)

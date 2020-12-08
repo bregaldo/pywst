@@ -13,7 +13,7 @@ class WST:
     This contains the corresponding coefficients and helps to handle and to plot these coefficients.
     """
     
-    def __init__(self, J, L, coeffs, index=None, cplx=False):
+    def __init__(self, J, L, coeffs, index=None, cplx=False, j_min=0):
         """
         Constructor.
 
@@ -31,6 +31,8 @@ class WST:
             Index of the coefficients stored in coeffs. The default is None.
         cplx : bool, optional
             Are these coefficients computed from complex images? The default is False.
+        j_min : type, optional
+            Minimum dyadic scale. The default is 0.
 
         Raises
         ------
@@ -45,11 +47,12 @@ class WST:
         self.J = J
         self.L = L
         self.cplx = cplx
+        self.j_min = j_min
         
         # Number of coefficients
         self.nb_m0 = 1
-        self.nb_m1 = J * L * (1 + cplx)
-        self.nb_m2 = J * (J - 1) * L * L * (1 + cplx) // 2
+        self.nb_m1 = (J - j_min) * L * (1 + cplx)
+        self.nb_m2 = (J - j_min) * (J - j_min - 1) * L * L * (1 + cplx) // 2
         
         self.coeffs = coeffs
         self.coeffs_cov = None
@@ -75,11 +78,11 @@ class WST:
             self.reorder(index)
         self.index = np.zeros((5, self.nb_m0 + self.nb_m1 + self.nb_m2))
         cnt = 1
-        for j1 in range(J):
+        for j1 in range(j_min, J):
             for theta1 in range(L * (1 + cplx)):
                 self.index[:, cnt] = [1, j1, theta1, 0, 0]
                 cnt += 1
-        for j1 in range(J):
+        for j1 in range(j_min, J):
             for theta1 in range(L * (1 + cplx)):
                 for j2 in range(j1 + 1, J):
                     for theta2 in range(L):
@@ -93,12 +96,12 @@ class WST:
         # Plot design parameters
         self._xticks, self._xticksMinor, self._xticklabels, self._xticklabelsMinor, self._tickAlignment = [], [], [], [], []
         cnt = 1
-        for j1 in range(J):
+        for j1 in range(j_min, J):
             self._xticks.append(cnt + L * (1 + cplx) // 2) # Tick at the middle
             self._xticklabels.append("$j_1 = " + str(j1) + "$")
             self._tickAlignment.append(0.0)
             cnt += L * (1 + cplx)
-        for j1 in range(J - 1):
+        for j1 in range(j_min, J - 1):
             for theta1 in range(L * (1 + cplx)):
                 for j2 in range(j1 + 1, J):
                     self._xticksMinor.append(cnt + L // 2)
@@ -263,15 +266,15 @@ class WST:
         if not self.normalized:
             coeffsCopy = self.coeffs.copy()
             cnt = 1
-            for j1 in range(self.J):
+            for j1 in range(self.j_min, self.J):
                 if self.log2vals:
                     self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] -= coeffsCopy[:1, ...]
                 else:
                     self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] /= coeffsCopy[:1, ...]
                 cnt += self.L * (1 + self.cplx)
-            for j1 in range(self.J):
+            for j1 in range(self.j_min, self.J):
                 for theta1 in range(self.L * (1 + self.cplx)):
-                    index = 1 + j1 * self.L * (1 + self.cplx) + theta1
+                    index = 1 + (j1 - self.j_min) * self.L * (1 + self.cplx) + theta1
                     if self.log2vals:
                         self.coeffs[cnt:cnt + self.L * (self.J - j1 - 1), ...] -= coeffsCopy[index:index + 1, ...]
                     else:
@@ -293,15 +296,15 @@ class WST:
         
         if self.normalized:
             cnt = 1
-            for j1 in range(self.J):
+            for j1 in range(self.j_min, self.J):
                 if self.log2vals:
                     self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] += self.coeffs[:1, ...]
                 else:
                     self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] *= self.coeffs[:1, ...]
                 cnt += self.L * (1 + self.cplx)
-            for j1 in range(self.J):
+            for j1 in range(self.j_min, self.J):
                 for theta1 in range(self.L * (1 + self.cplx)):
-                    index = 1 + j1 * self.L * (1 + self.cplx) + theta1
+                    index = 1 + (j1 - self.j_min) * self.L * (1 + self.cplx) + theta1
                     if self.log2vals:
                         self.coeffs[cnt:cnt + self.L * (self.J - j1 - 1), ...] += self.coeffs[index:index + 1, ...]
                     else:
@@ -462,10 +465,10 @@ class WST:
         
         # Plot separators
         cnt = 1
-        for j1 in range(self.J):
+        for j1 in range(self.j_min, self.J):
             axis.axvline(cnt, color='black', alpha=0.5, linestyle='dashed')
             cnt += self.L * (1 + self.cplx)
-        for j1 in range(self.J):
+        for j1 in range(self.j_min, self.J):
             axis.axvline(cnt, color='black', alpha=0.5, linestyle='dashed')
             for theta1 in range(self.L * (1 + self.cplx)):
                 if theta1 >= 1:
@@ -508,7 +511,7 @@ class WST:
         
         Default behaviour plots both layer 1 and layer 2 full set of coefficients.
         
-        Note that the current object and the objects of wst_list must be of consistent J, L and cplx parameters.
+        Note that the current object and the objects of wst_list must be of consistent J, L, cplx and j_min parameters.
 
         Parameters
         ----------
@@ -540,7 +543,7 @@ class WST:
             if type(elt) != WST and type(elt) != RWST:
                 raise Exception("wst_list must be a WST object or a RWST object, or a list of RWST or/and WST objects!")
             else:
-                if self.J != elt.J or self.L != elt.L or (type(elt) == WST and self.cplx != elt.cplx):
+                if self.J != elt.J or self.L != elt.L or self.j_min != elt.j_min or (type(elt) == WST and self.cplx != elt.cplx):
                     raise Exception("Inconsistent (R)WST objects.")
                 if type(elt) == WST and (self.log2vals != elt.log2vals or self.normalized != elt.normalized):
                     raise warnings.warn("Warning! Input (R)WST objects have not consistent normalizations compared to the current WST object.")

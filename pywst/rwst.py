@@ -12,7 +12,7 @@ class RWST:
     This contains the corresponding coefficients and helps to handle and to plot these coefficients.
     """
     
-    def __init__(self, J, L, model, loc_shape=()):
+    def __init__(self, J, L, model, loc_shape=(), j_min=0):
         """
         Constructor.
 
@@ -26,6 +26,8 @@ class RWST:
             Chosen RWST model object.
         loc_shape : tuple of ints, optional
             Shape of the local dimensions (batch dimension + local dimensions)
+        j_min : type, optional
+            Minimum dyadic scale. The default is 0.
 
         Returns
         -------
@@ -35,6 +37,7 @@ class RWST:
         self.J = J
         self.L = L
         self.model = model
+        self.j_min = j_min
         
         self.coeffs = {}
         self.coeffs_cov = {}
@@ -45,11 +48,11 @@ class RWST:
         
         # Initialization for each of the three layer of coefficients
         self.coeffs['m0'] = np.zeros((1,) + loc_shape)
-        self.coeffs['m1'] = np.zeros((J, model.layer1_nbparams + 1) + loc_shape)       # +1 to add chi2r coefficients
-        self.coeffs['m2'] = np.zeros((J, J, model.layer2_nbparams + 1) + loc_shape)    # +1 to add chi2r coefficients
+        self.coeffs['m1'] = np.zeros((J - j_min, model.layer1_nbparams + 1) + loc_shape)       # +1 to add chi2r coefficients
+        self.coeffs['m2'] = np.zeros((J - j_min, J - j_min, model.layer2_nbparams + 1) + loc_shape)    # +1 to add chi2r coefficients
         self.coeffs_cov['m0'] = np.zeros((1, 1) + loc_shape) # Actually, it is not possible yet to get local information for this m0 covariance matrix.
-        self.coeffs_cov['m1'] = np.zeros((J, model.layer1_nbparams, model.layer1_nbparams) + loc_shape)
-        self.coeffs_cov['m2'] = np.zeros((J, J, model.layer2_nbparams, model.layer2_nbparams) + loc_shape)
+        self.coeffs_cov['m1'] = np.zeros((J - j_min, model.layer1_nbparams, model.layer1_nbparams) + loc_shape)
+        self.coeffs_cov['m2'] = np.zeros((J - j_min, J - j_min, model.layer2_nbparams, model.layer2_nbparams) + loc_shape)
         
     def _set_mask(self, mask):
         """
@@ -105,14 +108,14 @@ class RWST:
             self.coeffs['m0'] = coeffs
             self.coeffs_cov['m0'][:] = coeffs_cov
         elif layer == 1:
-            self.coeffs['m1'][jVals, :-1] = coeffs
-            self.coeffs['m1'][jVals, -1:] = chi2r
-            self.coeffs_cov['m1'][jVals] = coeffs_cov
+            self.coeffs['m1'][jVals - self.j_min, :-1] = coeffs
+            self.coeffs['m1'][jVals - self.j_min, -1:] = chi2r
+            self.coeffs_cov['m1'][jVals - self.j_min] = coeffs_cov
         elif layer == 2:
             j1, j2 = jVals
-            self.coeffs['m2'][j1, j2, :-1] = coeffs
-            self.coeffs['m2'][j1, j2, -1:] = chi2r
-            self.coeffs_cov['m2'][j1, j2] = coeffs_cov
+            self.coeffs['m2'][j1 - self.j_min, j2 -self.j_min, :-1] = coeffs
+            self.coeffs['m2'][j1 - self.j_min, j2 - self.j_min, -1:] = chi2r
+            self.coeffs_cov['m2'][j1 - self.j_min, j2 - self.j_min] = coeffs_cov
 
     def get_coeffs(self, name):
         """
@@ -212,16 +215,16 @@ class RWST:
             if j1 is None:
                 return self.coeffs_cov['m1']
             else:
-                return self.coeffs_cov['m1'][j1]
+                return self.coeffs_cov['m1'][j1 - self.j_min]
         elif layer == 2:
             if j1 is None and j2 is None:
                 return self.coeffs_cov['m2']
             elif j1 is None and j2 is not None:
-                return self.coeffs_cov['m2'][:, j2]
+                return self.coeffs_cov['m2'][:, j2 - self.j_min]
             elif j1 is not None and j2 is None:
-                return self.coeffs_cov['m2'][j1, :]
+                return self.coeffs_cov['m2'][j1 - self.j_min, :]
             else:
-                return self.coeffs_cov['m2'][j1, j2]
+                return self.coeffs_cov['m2'][j1 - self.j_min, j2 - self.j_min]
         else:
             raise Exception("Choose a layer between 0 and 2!")
             
@@ -293,7 +296,7 @@ class RWST:
         
         Default behaviour plots layer 1 and layer 2 coefficients, and the reduced chi square values.
         
-        Note that the current object and the objects of rwst_list must be of consistent J, L, RWST model.
+        Note that the current object and the objects of rwst_list must be of consistent J, L, RWST model, j_min.
 
         Parameters
         ----------
@@ -322,7 +325,7 @@ class RWST:
             if type(elt) != RWST:
                 raise Exception("rwst_list must be a RWST object or a list of RWST objects!")
             else:
-                if self.J != elt.J or self.L != elt.L or type(self.model) != type(elt.model):
+                if self.J != elt.J or self.L != elt.L or self.j_min != elt.j_min or type(self.model) != type(elt.model):
                     raise Exception("Inconsistent RWST objects.")
             
         if names == []:
@@ -384,7 +387,7 @@ class RWST:
                     # Define an index of local positions that are not masked.
                     validLocIndex = [loc for loc in np.ndindex(loc_shape) if mask[loc] == False]
                     
-                    j1Vals = np.arange(rwst_curr.J)
+                    j1Vals = np.arange(rwst_curr.j_min, rwst_curr.J)
                     
                     if ax_index < len(indexLayer1): # Plot instructions for first order coefficients
                         index = indexLayer1[ax_index]
@@ -430,7 +433,7 @@ class RWST:
                                 coeffsStd = np.sqrt(rwst_curr.coeffs_cov['m2'][np.index_exp[:, :, index, index] + locIndex])
                             else:
                                 coeffsStd = np.zeros(coeffs.shape)
-                            for j1 in np.arange(rwst_curr.J - 1):
+                            for j1 in np.arange(rwst_curr.j_min, rwst_curr.J - 1):
                                 j2Vals = np.arange(j1 + 1, rwst_curr.J)
                                 if j1 != rwst_curr.J - 2:
                                     
@@ -444,10 +447,12 @@ class RWST:
                                             label += str(locIndex)
                                     if label != "": legend = True # Need to display a legend
                                         
-                                    axs[pos].plot(j2Vals, coeffs[j1, j1 + 1:], label=label, color=color)
-                                    axs[pos].fill_between(j2Vals, coeffs[j1, j1 + 1:] - coeffsStd[j1, j1 + 1:], coeffs[j1, j1 + 1:] + coeffsStd[j1, j1 + 1:], alpha=0.2, color=color)
+                                    axs[pos].plot(j2Vals, coeffs[j1 - self.j_min, j1 - self.j_min + 1:], label=label, color=color)
+                                    axs[pos].fill_between(j2Vals, coeffs[j1 - self.j_min, j1 - self.j_min + 1:] - coeffsStd[j1 - self.j_min,j1 - self.j_min + 1:], \
+                                                          coeffs[j1 - self.j_min, j1 -self.j_min + 1:] + coeffsStd[j1 - self.j_min, j1 - self.j_min + 1:], alpha=0.2, color=color)
                                 else:
-                                    axs[pos].errorbar(j2Vals, coeffs[j1, j1 + 1:], fmt='.', yerr=coeffsStd[j1, j1 + 1:], color=color)
+                                    axs[pos].errorbar(j2Vals, coeffs[j1 - self.j_min, j1 - self.j_min + 1:], fmt='.', \
+                                                      yerr=coeffsStd[j1 -self.j_min, j1 - self.j_min + 1:], color=color)
                                     
                             color_cnt += 1
                         
@@ -478,10 +483,10 @@ class RWST:
         """
         # Build a WST index
         wst_index = [[0, 0, 0, 0, 0]] # Layer 0
-        for j1 in range(self.J): # Layer 1
+        for j1 in range(self.j_min, self.J): # Layer 1
             for theta1 in range(self.L * (1 + cplx)):
                 wst_index.append([1, j1, theta1, 0, 0])
-        for j1 in range(self.J): # Layer 2
+        for j1 in range(self.j_min, self.J): # Layer 2
             for theta1 in range(self.L * (1 + cplx)):
                 for j2 in range(j1 + 1, self.J):
                     for theta2 in range(self.L):
@@ -503,24 +508,24 @@ class RWST:
         S[0] = self.coeffs['m0'][0]
         
         # S1 coefficients
-        for j1 in range(self.J):
+        for j1 in range(self.j_min, self.J):
             filtering = np.logical_and(wst_index[0] == 1, wst_index[1] == j1)
             theta_vals = wst_index[2, filtering]
-            coeffs = self.coeffs['m1'][j1, :-1]
+            coeffs = self.coeffs['m1'][j1 - self.j_min, :-1]
             for loc_index in np.ndindex(loc_shape):
                 S[(filtering,) + loc_index] = self.model.layer1(theta_vals, *(coeffs[np.index_exp[:] + loc_index]))
             
         # S2 coefficients
-        for j1 in range(self.J):
+        for j1 in range(self.j_min, self.J):
             for j2 in range(j1 + 1, self.J):
                 filtering = np.logical_and(wst_index[1] == j1, wst_index[3] == j2)
                 theta_vals = (wst_index[2, filtering], wst_index[4, filtering])
-                coeffs = self.coeffs['m2'][j1, j2, :-1]
+                coeffs = self.coeffs['m2'][j1 - self.j_min, j2 - self.j_min, :-1]
                 for loc_index in valid_loc_index:
                     S[(filtering,) + loc_index] = self.model.layer2(theta_vals, *(coeffs[np.index_exp[:] + loc_index]))
                 
         # We create the WST object and fill out its attributes
-        wst = pw.WST(self.J, self.L, S, index=wst_index, cplx=cplx)
+        wst = pw.WST(self.J, self.L, S, index=wst_index, cplx=cplx, j_min=self.j_min)
         wst.normalized = self.wst_normalized
         wst.log2vals = self.wst_log2vals
         

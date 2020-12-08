@@ -17,7 +17,7 @@ class RWSTOp:
     Reduced Wavelet Scattering Transform (RWST) operator.
     """
     
-    def __init__(self, M, N, J, L=8, OS=0, cplx=False, model_cls=RWSTModel1, wst_op=None):
+    def __init__(self, M, N, J, L=8, OS=0, cplx=False, model_cls=RWSTModel1, wst_op=None, j_min=0):
         """
         Constructor.
         
@@ -39,20 +39,22 @@ class RWSTOp:
             Class of the RWST model of the angular dependencies. The default is RWSTModel1.
         wst_op : WSTOp, optional
             WSTOp object with consistent parameters that avoids multiple filters loading.
+        j_min : type, optional
+            Minimum dyadic scale. The default is 0.
 
         Returns
         -------
         None.
         """
-        self.M, self.N, self.J, self.L, self.OS, self.cplx = M, N, J, L, OS, cplx
+        self.M, self.N, self.J, self.L, self.OS, self.cplx, self.j_min = M, N, J, L, OS, cplx, j_min
         if wst_op is None:
-            self.wst_op = WSTOp(M, N, J, L, OS, cplx)
+            self.wst_op = WSTOp(M, N, J, L, OS, cplx, j_min=j_min)
         else:
-            if wst_op.M == M and wst_op.N == N and wst_op.J == J and wst_op.L == L and wst_op.OS == OS and wst_op.cplx == cplx:
+            if wst_op.M == M and wst_op.N == N and wst_op.J == J and wst_op.L == L and wst_op.OS == OS and wst_op.cplx == cplx and wst_op.j_min == j_min:
                 self.wst_op = wst_op
             else:
                 warnings.warn("Warning! Loading WSTOp new instance because of wst_op inconsistencies.")
-                self.wst_op = WSTOp(M, N, J, L, OS, cplx)
+                self.wst_op = WSTOp(M, N, J, L, OS, cplx, j_min=j_min)
         self.model_cls = model_cls
     
     def apply(self, data, local=False, wst_average=False, crop=0.0, diag_cov=True):
@@ -92,6 +94,8 @@ class RWSTOp:
             wst = data
             if wst.J != self.J:
                 raise Exception("Inconsistent J values between RWST operator and input WST coefficients.")
+            if wst.j_min != self.j_min:
+                raise Exception("Inconsistent j_min values between RWST operator and input WST coefficients.")
             if not wst.log2vals:
                 warnings.warn("Input WST coefficients must have logarithmic values. Auto-computation of logarithmic coefficients...")
                 wst.to_log2()
@@ -110,7 +114,7 @@ class RWSTOp:
         validLocIndex = [loc for loc in np.ndindex(loc_shape) if mask[loc] == False]
         
         model = self.model_cls(self.L)
-        rwst = RWST(self.J, self.L, model, loc_shape=loc_shape)
+        rwst = RWST(self.J, self.L, model, loc_shape=loc_shape, j_min=self.j_min)
         
         # We keep relevant information on the WST object
         rwst.wst_log2vals = wst.log2vals
@@ -130,7 +134,7 @@ class RWSTOp:
         ##
 
         # Layer 1 coefficients
-        for j1 in range(self.J):
+        for j1 in range(self.j_min, self.J):
             coeffs, coeffsIndex = wst.get_coeffs(layer=1, j1=j1)
             coeffs_cov, _ = wst.get_coeffs_cov(layer=1, j1=j1, autoremove_offdiag=not diag_cov)
             if diag_cov and coeffs_cov is not None: # Only keep diagonal coefficients if required
@@ -154,7 +158,7 @@ class RWSTOp:
             rwst._set_coeffs(1, j1, paramsOpt, paramsCov, chi2r)
             
         # Layer 2 coefficients
-        for j1 in range(self.J):
+        for j1 in range(self.j_min, self.J):
             for j2 in range(j1 + 1, self.J):
                 coeffs, coeffsIndex = wst.get_coeffs(layer=2, j1=j1, j2=j2)
                 coeffs_cov, _ = wst.get_coeffs_cov(layer=2, j1=j1, j2=j2, autoremove_offdiag=not diag_cov)
