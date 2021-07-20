@@ -578,7 +578,7 @@ class WST:
             ax = fig.add_subplot(1, 1, 1)
                 
             # ylabel design
-            ylabel = r"$" + self.log2vals * r"\log_2(" + self.normalized * r"\widebar{" + r"S" + self.normalized * r"}" + r"_" + str(layer) + self.log2vals * r")" + r"$"
+            ylabel = r"$" + self.log2vals * r"\log_2(" + self.normalized * r"\overline{" + r"S" + self.normalized * r"}" + r"_" + str(layer) + self.log2vals * r")" + r"$"
             
             # Plot
             for wst_index, wst_curr in enumerate(wst_list_loc):

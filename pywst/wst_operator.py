@@ -94,7 +94,7 @@ class WSTOp:
             build_bp_para_loc = partial(_build_bp_para, bp_filter_cls=bp_filter_cls, M=self.M, N=self.N, j=j, L=self.L, gamma=gamma, sigma0=sigma0, k0=k0)
             nb_processes = os.cpu_count()
             work_list = np.array_split(np.arange(self.L), nb_processes)
-            pool = mp.get_context("spawn").Pool(processes=nb_processes) # "Spawn" context for macOS compatibility
+            pool = mp.Pool(processes=nb_processes)
             results = pool.map(build_bp_para_loc, work_list)
             bp_filters = []
             for i in range(len(results)):

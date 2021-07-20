@@ -121,13 +121,13 @@ class RWSTModel1 (RWSTModelBase):
         super().__init__(L)
         self.layer1_names = ['S1Iso', 'S1Aniso', 'ThetaRef1']
         self.layer2_names = ['S2Iso1', 'S2Iso2', 'S2Aniso1', 'S2Aniso2', 'ThetaRef2']
-        self.layer1_pltparams = [(r'$\widehat{S}_1^{\mathrm{iso}}(j_1)$', False),
-                                 (r'$\widehat{S}_1^{\mathrm{aniso}}(j_1)$', False),
+        self.layer1_pltparams = [(r'$\hat{S}_1^{\mathrm{iso}}(j_1)$', False),
+                                 (r'$\hat{S}_1^{\mathrm{aniso}}(j_1)$', False),
                                  (r'$\theta^{\mathrm{ref,1}}(j_1)$', True)]
-        self.layer2_pltparams = [(r'$\widehat{S}_2^{\mathrm{iso,1}}(j_1,j_2)$', False),
-                                 (r'$\widehat{S}_2^{\mathrm{iso,2}}(j_1,j_2)$', False),
-                                 (r'$\widehat{S}_2^{\mathrm{aniso,1}}(j_1,j_2)$', False),
-                                 (r'$\widehat{S}_2^{\mathrm{aniso,2}}(j_1,j_2)$', False),
+        self.layer2_pltparams = [(r'$\hat{S}_2^{\mathrm{iso,1}}(j_1,j_2)$', False),
+                                 (r'$\hat{S}_2^{\mathrm{iso,2}}(j_1,j_2)$', False),
+                                 (r'$\hat{S}_2^{\mathrm{aniso,1}}(j_1,j_2)$', False),
+                                 (r'$\hat{S}_2^{\mathrm{aniso,2}}(j_1,j_2)$', False),
                                  (r'$\theta^{\mathrm{ref,2}}(j_1,j_2)$', True)]
         self.layer1_nbparams = len(self.layer1_names)
         self.layer2_nbparams = len(self.layer2_names)
@@ -199,17 +199,17 @@ class RWSTModel2 (RWSTModelBase):
         super().__init__(L)
         self.layer1_names = ['S1Iso', 'S1Aniso', 'ThetaRef1', 'S1Lat1', 'S1Lat2']
         self.layer2_names = ['S2Iso1', 'S2Iso2', 'S2Aniso1', 'S2Aniso2', 'ThetaRef2', 'S2Iso3']
-        self.layer1_pltparams = [(r'$\widehat{S}_1^{\mathrm{iso}}(j_1)$', False),
-                                 (r'$\widehat{S}_1^{\mathrm{aniso}}(j_1)$', False),
+        self.layer1_pltparams = [(r'$\hat{S}_1^{\mathrm{iso}}(j_1)$', False),
+                                 (r'$\hat{S}_1^{\mathrm{aniso}}(j_1)$', False),
                                  (r'$\theta^{\mathrm{ref,1}}(j_1)$', True),
-                                 (r'$\widehat{S}_1^{\mathrm{lat, 1}}(j_1)$', False),
-                                 (r'$\widehat{S}_1^{\mathrm{lat, 2}}(j_1)$', False)]
-        self.layer2_pltparams = [(r'$\widehat{S}_2^{\mathrm{iso,1}}(j_1,j_2)$', False),
-                                 (r'$\widehat{S}_2^{\mathrm{iso,2}}(j_1,j_2)$', False),
-                                 (r'$\widehat{S}_2^{\mathrm{aniso,1}}(j_1,j_2)$', False),
-                                 (r'$\widehat{S}_2^{\mathrm{aniso,2}}(j_1,j_2)$', False),
+                                 (r'$\hat{S}_1^{\mathrm{lat, 1}}(j_1)$', False),
+                                 (r'$\hat{S}_1^{\mathrm{lat, 2}}(j_1)$', False)]
+        self.layer2_pltparams = [(r'$\hat{S}_2^{\mathrm{iso,1}}(j_1,j_2)$', False),
+                                 (r'$\hat{S}_2^{\mathrm{iso,2}}(j_1,j_2)$', False),
+                                 (r'$\hat{S}_2^{\mathrm{aniso,1}}(j_1,j_2)$', False),
+                                 (r'$\hat{S}_2^{\mathrm{aniso,2}}(j_1,j_2)$', False),
                                  (r'$\theta^{\mathrm{ref,2}}(j_1,j_2)$', True),
-                                 (r'$\widehat{S}_2^{\mathrm{iso,3}}(j_1,j_2)$', False)]
+                                 (r'$\hat{S}_2^{\mathrm{iso,3}}(j_1,j_2)$', False)]
         self.layer1_nbparams = len(self.layer1_names)
         self.layer2_nbparams = len(self.layer2_names)
         
