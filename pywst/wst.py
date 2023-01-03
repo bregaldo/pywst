@@ -91,6 +91,7 @@ class WST:
                         
         # Normalization initialization
         self.normalized = False
+        self.normalize_layer1 = None
         self.log2vals = False
         
         # Plot design parameters
@@ -216,7 +217,7 @@ class WST:
             if self.coeffs_cov is not None:
                 warnings.warn("Warning! The covariance matrix has already been computed with linear coefficients. We compute logarithmic errors from diagonal coefficients and discard off-diagonal coefficients.")
                 self.coeffs_cov = np.diag(np.diag(self.coeffs_cov)/(self.coeffs*np.log(2))**2)
-            self.coeffs = np.log2(self.coeffs)
+            self.coeffs = ma.log2(self.coeffs)
             self.log2vals = True
         return self
             
@@ -240,12 +241,12 @@ class WST:
             self.log2vals = False
         return self
         
-    def normalize(self):
+    def normalize(self, normalize_layer1=False):
         """
         Normalization of the coefficients.
         
         Layer 0 coefficients are left unchanged.
-        Layer 1 coefficients are normalized by layer 0 coefficients (locally if available):
+        Layer 1 coefficients are left unchanged if normalize_layer1 is False (default). Otherwise normalized by layer 0 coefficients (locally if available):
             
         .. math::
             
@@ -257,6 +258,11 @@ class WST:
             
             \\bar{S}_2(j_1,\\theta_1,j_2,\\theta_2) = S_2(j_1,\\theta_1,j_2,\\theta_2)/S_1(j_1,\\theta_1)
 
+        Parameters
+        ----------
+        normalize_layer1 : bool, optional
+            Should layer 1 be also normalized? The default is False.
+
         Returns
         -------
         self
@@ -265,24 +271,37 @@ class WST:
         if self.coeffs_cov is not None:
             warnings.warn("Warning! The covariance matrix has been computed before the normalization and will not be updated.")
         
-        if not self.normalized:
+        # Case where no normalization was done or layer 1 normalization is asked to change
+        if (not self.normalized) or (self.normalize_layer1 == (not normalize_layer1)):
             coeffsCopy = self.coeffs.copy()
             cnt = 1
+            # Layer 1
             for j1 in range(self.j_min, self.J):
-                if self.log2vals:
-                    self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] -= coeffsCopy[:1, ...]
-                else:
-                    self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] /= coeffsCopy[:1, ...]
-                cnt += self.L * (1 + self.cplx)
-            for j1 in range(self.j_min, self.J):
-                for theta1 in range(self.L * (1 + self.cplx)):
-                    index = 1 + (j1 - self.j_min) * self.L * (1 + self.cplx) + theta1
+                # Case where layer 1 was not normalized but is now asked to be normalized
+                if ((not self.normalized) or (not self.normalize_layer1)) and normalize_layer1:
                     if self.log2vals:
-                        self.coeffs[cnt:cnt + self.L * (self.J - j1 - 1), ...] -= coeffsCopy[index:index + 1, ...]
+                        self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] -= coeffsCopy[:1, ...]
                     else:
-                        self.coeffs[cnt:cnt + self.L * (self.J - j1 - 1), ...] /= coeffsCopy[index:index + 1, ...]
-                    cnt += self.L * (self.J - j1 - 1)
+                        self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] /= coeffsCopy[:1, ...]
+                # Case where normalization was done with layer 1 normalized and layer 1 is asked not to be normalized
+                elif self.normalized and self.normalize_layer1 and (not normalize_layer1):
+                    if self.log2vals:
+                        self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] += coeffsCopy[:1, ...]
+                    else:
+                        self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] *= coeffsCopy[:1, ...]
+                cnt += self.L * (1 + self.cplx)
+            # Layer 2
+            if (not self.normalized):
+                for j1 in range(self.j_min, self.J):
+                    for theta1 in range(self.L * (1 + self.cplx)):
+                        index = 1 + (j1 - self.j_min) * self.L * (1 + self.cplx) + theta1
+                        if self.log2vals:
+                            self.coeffs[cnt:cnt + self.L * (self.J - j1 - 1), ...] -= coeffsCopy[index:index + 1, ...]
+                        else:
+                            self.coeffs[cnt:cnt + self.L * (self.J - j1 - 1), ...] /= coeffsCopy[index:index + 1, ...]
+                        cnt += self.L * (self.J - j1 - 1)
             self.normalized = True
+            self.normalize_layer1 = normalize_layer1
         return self
             
     def unnormalize(self):
@@ -300,10 +319,11 @@ class WST:
         if self.normalized:
             cnt = 1
             for j1 in range(self.j_min, self.J):
-                if self.log2vals:
-                    self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] += self.coeffs[:1, ...]
-                else:
-                    self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] *= self.coeffs[:1, ...]
+                if self.normalize_layer1:
+                    if self.log2vals:
+                        self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] += self.coeffs[:1, ...]
+                    else:
+                        self.coeffs[cnt:cnt + self.L * (1 + self.cplx), ...] *= self.coeffs[:1, ...]
                 cnt += self.L * (1 + self.cplx)
             for j1 in range(self.j_min, self.J):
                 for theta1 in range(self.L * (1 + self.cplx)):
@@ -314,6 +334,7 @@ class WST:
                         self.coeffs[cnt:cnt + self.L * (self.J - j1 - 1), ...] *= self.coeffs[index:index + 1, ...]
                     cnt += self.L * (self.J - j1 - 1)
             self.normalized = False
+            self.normalize_layer1 = None
         return self
                 
     def average(self):
@@ -578,7 +599,7 @@ class WST:
             ax = fig.add_subplot(1, 1, 1)
                 
             # ylabel design
-            ylabel = r"$" + self.log2vals * r"\log_2(" + self.normalized * r"\overline{" + r"S" + self.normalized * r"}" + r"_" + str(layer) + self.log2vals * r")" + r"$"
+            ylabel = r"$" + self.log2vals * r"\log_2(" + self.normalized * (layer==2 or self.normalize_layer1==True) * r"\overline{" + r"S" + self.normalized * (layer==2 or self.normalize_layer1==True) * r"}" + r"_" + str(layer) + self.log2vals * r")" + r"$"
             
             # Plot
             for wst_index, wst_curr in enumerate(wst_list_loc):
@@ -588,8 +609,8 @@ class WST:
                 
                 # Get the shape of the local information (batch + local coefficients per map)
                 loc_shape = wst_curr.coeffs.shape[1:]
-                # Get a mask associated to S0 coefficient if any local coefficient turns out to be masked (we assume uniform mask along coefficient index axis).
-                mask = ma.getmaskarray(wst_curr.coeffs[0])
+                # Get a mask associated to S2 coefficient if any local coefficient turns out to be masked (we assume uniform mask along coefficient index axis).
+                mask = ma.getmaskarray(wst_curr.coeffs[-1])
                 # Define an index of local positions that are not masked.
                 validLocIndex = [loc for loc in np.ndindex(loc_shape) if mask[loc] == False]
                 

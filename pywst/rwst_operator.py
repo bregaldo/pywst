@@ -108,8 +108,8 @@ class RWSTOp:
         
         # Get the shape of the local information (batch + local coefficients per map)
         loc_shape = wst.coeffs.shape[1:]
-        # Get a mask associated to S0 coefficient if any local coefficient turns out to be masked (we assume uniform mask along coefficient index axis).
-        mask = ma.getmaskarray(wst.coeffs[0])
+        # Get a mask associated to S2 coefficient if any local coefficient turns out to be masked (we assume uniform mask along coefficient index axis).
+        mask = ma.getmaskarray(wst.coeffs[-1])
         # Define an index of local positions that are not masked.
         validLocIndex = [loc for loc in np.ndindex(loc_shape) if mask[loc] == False]
         

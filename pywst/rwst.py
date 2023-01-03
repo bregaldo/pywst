@@ -382,8 +382,8 @@ class RWST:
                 
                     # Get local parameters
                     loc_shape = rwst_curr.coeffs['m0'].shape[1:]
-                    # Get a mask associated to S0 coefficient if any local coefficient turns out to be masked (we assume uniform mask along coefficient index axis).
-                    mask = ma.getmaskarray(rwst_curr.coeffs['m0'][0])
+                    # Get a mask associated to S2 coefficient if any local coefficient turns out to be masked (we assume uniform mask along coefficient index axis).
+                    mask = ma.getmaskarray(rwst_curr.coeffs['m2'][0,0,0])
                     # Define an index of local positions that are not masked.
                     validLocIndex = [loc for loc in np.ndindex(loc_shape) if mask[loc] == False]
                     
@@ -495,7 +495,7 @@ class RWST:
         
         # Get local shape and mask
         loc_shape = self.coeffs['m0'][0].shape
-        mask = ma.getmaskarray(self.coeffs['m0'][0])
+        mask = ma.getmaskarray(self.coeffs['m2'][0,0,0])
         valid_loc_index = [loc for loc in np.ndindex(loc_shape) if mask[loc] == False]
         
         # Initialization
