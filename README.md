@@ -39,6 +39,10 @@ pip uninstall pywst
 
 ## Changelog
 
+### 1.0
+
+* Minor updates.
+
 ### 0.9
 
 * First public version.

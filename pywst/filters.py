@@ -13,7 +13,7 @@ class Filter:
     def __init__(self, M, N):
         self.M = M
         self.N = N
-        self.data = np.zeros((M, N), np.complex)
+        self.data = np.zeros((M, N), complex)
         self.type = self.__class__.__name__
         
         

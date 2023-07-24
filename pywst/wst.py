@@ -160,7 +160,7 @@ class WST:
             Boolean array for coefficients selection.
 
         """
-        filtering = np.ones(self.index.shape[1], np.bool)
+        filtering = np.ones(self.index.shape[1], bool)
         if layer is not None:
             filtering = np.logical_and(filtering, self.index[0] == layer)
         if j1 is not None:

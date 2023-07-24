@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="pywst",
-    version="0.9",
+    version="1.0",
     author="Bruno Régaldo-Saint Blancard",
     author_email="bruno.regaldo@phys.ens.fr",
     description="WST and RWST analyses tools for astrophysical data.",
