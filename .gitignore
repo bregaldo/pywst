@@ -4,3 +4,7 @@ examples/.ipynb_checkpoints/
 examples/TestScatnet/
 examples/demo_EA.ipynb
 .DS_Store
+
+dist/*
+build/*
+pywst.egg-info/*
