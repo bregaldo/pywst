@@ -1,4 +1,4 @@
-# PyWST : WST and RWST for astrophysics
+# PyWST: WST and RWST for astrophysics
 
 PyWST is a public Python package designed to perform statistical analyses of two-dimensional data with the Wavelet Scattering Transform (WST) and the Reduced Wavelet Scattering Transform (RWST).
 
@@ -27,7 +27,6 @@ pip install pywst
 Clone the repository and type from the main directory:
 
 ```
-pip install -r requirements.txt
 pip install .
 ```
 
